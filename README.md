@@ -97,6 +97,8 @@ screenshot, or follow a live game by sharing the game window and the log file).
 - `DEBUGGING.md`: how the reader records what it saw, and how to replay a debug bundle.
 
 ## Credits
+- **tidewarden**, [tli-vorax-simulator](https://github.com/tidewarden/tli-vorax-simulator): the base this helper is built on: its game engine, card
+  data and simulator (MIT, see LICENSE).
 - **Moebing**, [Torchlight-Infinite-SS11-Vorax-simulator](https://github.com/Moebing/Torchlight-Infinite-SS11-Vorax-simulator): the original Vorax simulator, used to gather the
   data the advice is built on (MIT, see LICENSE).
 - **Arcasti**, [tli-warden](https://github.com/arcasti/tli-warden): her solver logic.
