@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="description" content="How often each card turns up in real games, next to the simulator's odds.">
+<title>Vorax Card Odds</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral+SC:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; }
+
+/* Layout: one column of ledgers, a pool per section; each card a row with its live share drawn against the simulator's */
+:root {
+  --bg: #f3f0ef;
+  --panel: #fbf9f8;
+  --fg: #22191a;
+  --muted: #6e5f60;
+  --rule: #ddd3d2;
+  --accent: #8e1f2a;
+  --bar: #c9878d;
+  --sim: #22191a;
+  --higher: #1f6b4f;
+  --lower: #a2521a;
+  --display: "Spectral SC", Georgia, serif;
+  --body: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #160f10; --panel: #1f1617; --fg: #eee4e3; --muted: #a8979a; --rule: #3a2b2d;
+    --accent: #e0606c; --bar: #7e3a41; --sim: #f3e9e8; --higher: #5cc79c; --lower: #e8995c; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #160f10; --panel: #1f1617; --fg: #eee4e3; --muted: #a8979a; --rule: #3a2b2d;
+  --accent: #e0606c; --bar: #7e3a41; --sim: #f3e9e8; --higher: #5cc79c; --lower: #e8995c; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 32px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 36px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { font-family: var(--display); font-weight: 700; font-size: clamp(30px, 6vw, 46px); line-height: 1.05; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 65ch; margin: 0; }
+.facts { display: flex; flex-wrap: wrap; gap: 8px 22px; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.facts b { color: var(--fg); font-weight: 500; }
+.key { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--muted); align-items: center; }
+.key span { display: inline-flex; align-items: center; gap: 7px; }
+.sw-bar { width: 22px; height: 9px; background: var(--bar); border-radius: 2px; }
+.sw-range { width: 22px; height: 9px; border-left: 1.5px solid var(--fg); border-right: 1.5px solid var(--fg); position: relative; }
+.sw-range::after { content: ""; position: absolute; left: 0; right: 0; top: 4px; border-top: 1.5px solid var(--fg); }
+.sw-sim { width: 3px; height: 14px; background: var(--sim); }
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.controls input { font: inherit; padding: 8px 12px; border: 1px solid var(--rule); border-radius: 6px; background: var(--panel); color: var(--fg); min-width: 0; flex: 1 1 220px; max-width: 360px; }
+.controls input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+nav { display: flex; flex-wrap: wrap; gap: 6px; }
+nav a { font-size: 13px; color: var(--fg); text-decoration: none; padding: 5px 10px; border: 1px solid var(--rule); border-radius: 999px; }
+nav a:hover { border-color: var(--accent); color: var(--accent); }
+section { display: grid; gap: 12px; scroll-margin-top: 16px; }
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 16px; border-bottom: 2px solid var(--fg); padding-bottom: 6px; }
+h2 { font-family: var(--display); font-weight: 500; font-size: 24px; margin: 0; }
+.sec-sub { color: var(--muted); font-size: 13px; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 640px; }
+th { font-family: var(--mono); font-weight: 500; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+th button { all: unset; cursor: pointer; }
+th button:hover { color: var(--fg); }
+th[aria-sort] button { color: var(--fg); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--rule); vertical-align: middle; }
+td.num { font-family: var(--mono); font-size: 13px; text-align: right; white-space: nowrap; }
+th.num { text-align: right; }
+td.name { font-weight: 500; }
+.tag { font-family: var(--mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; padding: 1px 6px; border-radius: 3px; border: 1px solid currentColor; margin-left: 6px; white-space: nowrap; color: var(--accent); }
+.chart { width: 260px; }
+.track { position: relative; height: 16px; }
+.track .b { position: absolute; left: 0; top: 4px; height: 8px; background: var(--bar); border-radius: 1px; }
+.track .ci { position: absolute; top: 3px; height: 10px; border-left: 1.5px solid var(--fg); border-right: 1.5px solid var(--fg); }
+.track .ci::after { content: ""; position: absolute; left: 0; right: 0; top: 4px; border-top: 1.5px solid var(--fg); }
+.track .s { position: absolute; top: 0; width: 3px; height: 16px; background: var(--sim); margin-left: -1px; }
+.verdict { font-size: 12.5px; white-space: nowrap; }
+.v-higher { color: var(--higher); font-weight: 600; }
+.v-lower { color: var(--lower); font-weight: 600; }
+.v-ok { color: var(--muted); }
+.v-none { color: var(--muted); font-style: italic; }
+.note { color: var(--muted); font-size: 13px; max-width: 70ch; margin: 0; }
+.empty { color: var(--muted); font-size: 13px; padding: 10px 8px; }
+footer { color: var(--muted); font-size: 13px; display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 14px; }
+@media (max-width: 560px) { .chart { width: 160px; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow"><a href="index.html" style="color:inherit">Vorax Helper</a> · Surgical Preparation · Live odds</div>
+    <h1>How often each card turns up</h1>
+    <p class="lede">From boards the Solver read and shared in real games, next to the chance the simulator uses. A percentage is the share of all cards dealt in that kind of offer that were this card.</p>
+    <div class="facts" id="facts"></div>
+    <div class="key">
+      <span><i class="sw-bar"></i>Seen in live games</span>
+      <span><i class="sw-range"></i>Likely range (95%)</span>
+      <span><i class="sw-sim"></i>Simulator</span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <input id="filter" type="search" placeholder="Find a card" aria-label="Find a card">
+    <nav id="nav"></nav>
+  </div>
+
+  <div id="sections" style="display:grid;gap:40px"></div>
+
+  <footer>
+    <div>Page and data from an MIT-licensed Vorax simulator: a snapshot of the boards its players shared, as of the date above.</div>
+    <div>Range: Wilson 95% interval on the count. Where the simulator's chance falls outside it, the game shows the card more or less often than the simulator assumes.</div>
+    <div>Click a column heading to sort. Small samples (the Potion Kit) have wide ranges.</div>
+  </footer>
+</div>
+
+<script>
+const DATA = {"generated": "2026-10-21T10:13:55.475Z", "boards": 20866, "runs": 2285, "supreme": {"count": 11, "n": 1335, "p": 0.008239700374531835, "lo": 0.004607046512931569, "hi": 0.014694415288076109, "engine": 0.013}, "supremeNames": ["Compound Revitalizing Pill", "Fast-Acting Heart Tonic", "Plague Quarter Peat Poultice", "Insect Attractant", "Purest Holy Water", "Rousing Salts"], "sections": [{"id": "potions", "title": "Potion offer", "sub": "Each card in a normal 3-card potion offer", "rows": [{"name": "Anesthetic Tincture - Aemberon", "count": 46, "n": 1335, "p": 0.03445692883895131, "lo": 0.02593136844344571, "hi": 0.04565409767890961, "engine": 0.03432347747660267}, {"name": "Anesthetic Tincture - Agito", "count": 54, "n": 1335, "p": 0.04044943820224719, "lo": 0.031132848242395362, "hi": 0.05240324743912514, "engine": 0.03432347747660267}, {"name": "Bewitching Tincture", "count": 34, "n": 1335, "p": 0.02546816479400749, "lo": 0.0182816740809535, "hi": 0.03537784770265406, "engine": 0.022316955446425667}, {"name": "Brain Fog Tincture", "count": 35, "n": 1335, "p": 0.026217228464419477, "lo": 0.018910524185443506, "hi": 0.03624282629305971, "engine": 0.022316955446425667}, {"name": "Cleansing Ointment", "count": 30, "n": 1335, "p": 0.02247191011235955, "lo": 0.015785544864709546, "hi": 0.03189866213931542, "engine": 0.019594286881961735}, {"name": "Compound Leech Solution", "count": 31, "n": 1335, "p": 0.023220973782771534, "lo": 0.016406514203316222, "hi": 0.03277152149560439, "engine": 0.022316955446425667}, {"name": "Compound Revitalizing Pill", "count": 4, "n": 1335, "p": 0.00299625468164794, "lo": 0.001165764127858996, "hi": 0.007678896808879151, "engine": 0.0021666666666666666}, {"name": "Digestive Enzyme Solution", "count": 20, "n": 1335, "p": 0.0149812734082397, "lo": 0.009718693799753864, "hi": 0.023027226255314635, "engine": 0.022316955446425667}, {"name": "Eggshell Powder", "count": 27, "n": 1335, "p": 0.020224719101123594, "lo": 0.013936297757654903, "hi": 0.029266423161683125, "engine": 0.022316955446425667}, {"name": "Fast-Acting Heart Tonic", "count": 0, "n": 1335, "p": 0, "lo": 2.1621824422966068e-19, "hi": 0.002869346157155558, "engine": 0.0021666666666666666}, {"name": "Fresh Spinal Powder", "count": 20, "n": 1335, "p": 0.0149812734082397, "lo": 0.009718693799753864, "hi": 0.023027226255314635, "engine": 0.019594286881961735}, {"name": "Gray Matter Spinal Solution", "count": 29, "n": 1335, "p": 0.021722846441947566, "lo": 0.015166778373511406, "hi": 0.03102359993561792, "engine": 0.022316955446425667}, {"name": "Green Bile Solution", "count": 44, "n": 1335, "p": 0.03295880149812734, "lo": 0.024642343626175334, "hi": 0.043955465106388696, "engine": 0.035206734133125216}, {"name": "Hollow Spinal Solution", "count": 40, "n": 1335, "p": 0.0299625468164794, "lo": 0.022079998789458998, "hi": 0.04054249516352243, "engine": 0.03856219356751951}, {"name": "Insect Attractant", "count": 3, "n": 1335, "p": 0.0022471910112359553, "lo": 0.0007645217499960435, "hi": 0.0065863104918464565, "engine": 0.0021666666666666666}, {"name": "Leptomeningeal Solution", "count": 26, "n": 1335, "p": 0.01947565543071161, "lo": 0.013324830285256753, "hi": 0.02838406193918563, "engine": 0.019594286881961735}, {"name": "Mutagenic Powder", "count": 43, "n": 1335, "p": 0.03220973782771536, "lo": 0.02399972977067046, "hi": 0.04310425026699792, "engine": 0.022316955446425667}, {"name": "Osteogenic Powder", "count": 44, "n": 1335, "p": 0.03295880149812734, "lo": 0.024642343626175334, "hi": 0.043955465106388696, "engine": 0.04463391089285133}, {"name": "Osteolytic Ointment", "count": 24, "n": 1335, "p": 0.017977528089887642, "lo": 0.012110145784910936, "hi": 0.026611089049740157, "engine": 0.019594286881961735}, {"name": "Petrified Spinal Solution", "count": 31, "n": 1335, "p": 0.023220973782771534, "lo": 0.016406514203316222, "hi": 0.03277152149560439, "engine": 0.020592520890926686}, {"name": "Plague Quarter Peat Poultice", "count": 3, "n": 1335, "p": 0.0022471910112359553, "lo": 0.0007645217499960435, "hi": 0.0065863104918464565, "engine": 0.0021666666666666666}, {"name": "Potent Xenopurge Powder", "count": 36, "n": 1335, "p": 0.02696629213483146, "lo": 0.01954114406573617, "hi": 0.03710603510766269, "engine": 0.032588089270226696}, {"name": "Potion Kit (Large)", "count": 10, "n": 1335, "p": 0.00749063670411985, "lo": 0.004073774218644198, "hi": 0.01373385888746783, "engine": 0.010447751534989683}, {"name": "Potion Kit (Small)", "count": 15, "n": 1335, "p": 0.011235955056179775, "lo": 0.0068207927392813575, "hi": 0.018455983841308907, "engine": 0.009797143440980868}, {"name": "Probiotic Enzyme Solution", "count": 31, "n": 1335, "p": 0.023220973782771534, "lo": 0.016406514203316222, "hi": 0.03277152149560439, "engine": 0.03123812847583352}, {"name": "Pure Leech Solution", "count": 29, "n": 1335, "p": 0.021722846441947566, "lo": 0.015166778373511406, "hi": 0.03102359993561792, "engine": 0.02068837389161015}, {"name": "Purest Holy Water", "count": 0, "n": 1335, "p": 0, "lo": 2.1621824422966068e-19, "hi": 0.002869346157155558, "engine": 0.0021666666666666666}, {"name": "Rare Potion Kit (Small)", "count": 20, "n": 1335, "p": 0.0149812734082397, "lo": 0.009718693799753864, "hi": 0.023027226255314635, "engine": 0.020054208781677966}, {"name": "Rousing Salts", "count": 1, "n": 1335, "p": 0.000749063670411985, "lo": 0.00013223696921974557, "hi": 0.00423093788283146, "engine": 0.0021666666666666666}, {"name": "Slender-Limb Powder - Bone Sentry", "count": 68, "n": 1335, "p": 0.05093632958801498, "lo": 0.04037707690096779, "hi": 0.06407262050909177, "engine": 0.048882133905340054}, {"name": "Slender-Limb Powder - Pest", "count": 46, "n": 1335, "p": 0.03445692883895131, "lo": 0.02593136844344571, "hi": 0.04565409767890961, "engine": 0.03432347747660267}, {"name": "Slough Solution", "count": 34, "n": 1335, "p": 0.02546816479400749, "lo": 0.0182816740809535, "hi": 0.03537784770265406, "engine": 0.019594286881961735}, {"name": "Spinal Solution - Aemberon", "count": 43, "n": 1335, "p": 0.03220973782771536, "lo": 0.02399972977067046, "hi": 0.04310425026699792, "engine": 0.03432347747660267}, {"name": "Spinal Solution - Agito", "count": 49, "n": 1335, "p": 0.03670411985018727, "lo": 0.027873827885388974, "hi": 0.0481931243216533, "engine": 0.03432347747660267}, {"name": "Targeted Xeno-Hormone", "count": 40, "n": 1335, "p": 0.0299625468164794, "lo": 0.022079998789458998, "hi": 0.04054249516352243, "engine": 0.027164153990973175}, {"name": "Twin Hormone - Bone Sentry", "count": 64, "n": 1335, "p": 0.04794007490636704, "lo": 0.03772004307294754, "hi": 0.06075433955752944, "engine": 0.03432347747660267}, {"name": "Twin Hormone - Pest", "count": 46, "n": 1335, "p": 0.03445692883895131, "lo": 0.02593136844344571, "hi": 0.04565409767890961, "engine": 0.03432347747660267}, {"name": "Viscous Bile Solution", "count": 39, "n": 1335, "p": 0.029213483146067417, "lo": 0.021442950566516305, "hi": 0.03968571469156949, "engine": 0.022316955446425667}, {"name": "Vivigenic Powder", "count": 42, "n": 1335, "p": 0.03146067415730337, "lo": 0.023358437346055503, "hi": 0.04225171399671723, "engine": 0.036634083889143534}, {"name": "Viviparous Hormone", "count": 34, "n": 1335, "p": 0.02546816479400749, "lo": 0.0182816740809535, "hi": 0.03537784770265406, "engine": 0.022316955446425667}, {"name": "Xeno-Hormone", "count": 59, "n": 1335, "p": 0.044194756554307116, "lo": 0.034415860760835366, "hi": 0.05658937839516337, "engine": 0.04910524212451748}, {"name": "Xenopurge Powder", "count": 41, "n": 1335, "p": 0.030711610486891385, "lo": 0.022718511184332, "hi": 0.04139781146354508, "engine": 0.022316955446425667}]}, {"id": "kit", "title": "Potion Kit", "sub": "Each card in the 5-card hand a Potion Kit opens", "rows": [{"name": "Anesthetic Tincture - Aemberon", "count": 2, "n": 34, "p": 0.058823529411764705, "lo": 0.01628231306384244, "hi": 0.1909393688946371, "engine": 0.030303030303030304}, {"name": "Anesthetic Tincture - Agito", "count": 3, "n": 34, "p": 0.08823529411764706, "lo": 0.030465390304310145, "hi": 0.2296081795236041, "engine": 0.030303030303030304}, {"name": "Bewitching Tincture", "count": 2, "n": 34, "p": 0.058823529411764705, "lo": 0.01628231306384244, "hi": 0.1909393688946371, "engine": 0.030303030303030304}, {"name": "Brain Fog Tincture", "count": 2, "n": 34, "p": 0.058823529411764705, "lo": 0.01628231306384244, "hi": 0.1909393688946371, "engine": 0.030303030303030304}, {"name": "Digestive Enzyme Solution", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Eggshell Powder", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Fresh Spinal Powder", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Gray Matter Spinal Solution", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Mutagenic Powder", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Petrified Spinal Solution", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Slender-Limb Powder - Bone Sentry", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Slender-Limb Powder - Pest", "count": 3, "n": 34, "p": 0.08823529411764706, "lo": 0.030465390304310145, "hi": 0.2296081795236041, "engine": 0.030303030303030304}, {"name": "Slough Solution", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Spinal Solution - Aemberon", "count": 2, "n": 34, "p": 0.058823529411764705, "lo": 0.01628231306384244, "hi": 0.1909393688946371, "engine": 0.030303030303030304}, {"name": "Spinal Solution - Agito", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Targeted Xeno-Hormone", "count": 1, "n": 34, "p": 0.029411764705882353, "lo": 0.005210771925596642, "hi": 0.1491590221634482, "engine": 0.030303030303030304}, {"name": "Twin Hormone - Bone Sentry", "count": 3, "n": 34, "p": 0.08823529411764706, "lo": 0.030465390304310145, "hi": 0.2296081795236041, "engine": 0.030303030303030304}, {"name": "Twin Hormone - Pest", "count": 3, "n": 34, "p": 0.08823529411764706, "lo": 0.030465390304310145, "hi": 0.2296081795236041, "engine": 0.030303030303030304}, {"name": "Viscous Bile Solution", "count": 2, "n": 34, "p": 0.058823529411764705, "lo": 0.01628231306384244, "hi": 0.1909393688946371, "engine": 0.030303030303030304}, {"name": "Xenopurge Powder", "count": 2, "n": 34, "p": 0.058823529411764705, "lo": 0.01628231306384244, "hi": 0.1909393688946371, "engine": 0.030303030303030304}]}, {"id": "basic", "title": "Instruments, round 1", "sub": "Each card in the first (basic) instrument offer", "rows": [{"name": "Aberrant Sprout", "count": 579, "n": 4251, "p": 0.13620324629498942, "lo": 0.1262199139260972, "hi": 0.1468435063431791, "engine": 0.162195497995683}, {"name": "Aberrant Stinger", "count": 8, "n": 4251, "p": 0.0018819101387908728, "lo": 0.0009538971432418535, "hi": 0.003709402190862617, "engine": null}, {"name": "Adherent Metatarsals", "count": 372, "n": 4251, "p": 0.08750882145377559, "lo": 0.07938216893583651, "hi": 0.09638033183504997, "engine": 0.10268270120259018}, {"name": "Beak of the Twice-Born", "count": 7, "n": 4251, "p": 0.0016466713714420136, "lo": 0.0007978735863049178, "hi": 0.0033953729965996013, "engine": null}, {"name": "Black Goat Gut Suture", "count": 48, "n": 4251, "p": 0.011291460832745237, "lo": 0.008527336403403986, "hi": 0.014938072978698511, "engine": null}, {"name": "Canine Teeth File", "count": 65, "n": 4251, "p": 0.01529051987767584, "lo": 0.012015217071259778, "hi": 0.01944108908124188, "engine": null}, {"name": "Chrysalis Specimen", "count": 477, "n": 4251, "p": 0.1122088920254058, "lo": 0.1030687366944438, "hi": 0.1220493029524375, "engine": 0.13536848596978107}, {"name": "Clustered Eggs", "count": 42, "n": 4251, "p": 0.009880028228652082, "lo": 0.007317859850416452, "hi": 0.013327233024486341, "engine": null}, {"name": "Contracted Claws", "count": 557, "n": 4251, "p": 0.1310279934133145, "lo": 0.12121656070342131, "hi": 0.141505699039456, "engine": 0.15263644773358}, {"name": "Egg-Burdened Butterfly", "count": 7, "n": 4251, "p": 0.0016466713714420136, "lo": 0.0007978735863049178, "hi": 0.0033953729965996013, "engine": null}, {"name": "Eyelid Speculum", "count": 16, "n": 4251, "p": 0.0037638202775817455, "lo": 0.0023181295116557945, "hi": 0.006105591832048281, "engine": null}, {"name": "Fouled Scraper", "count": 52, "n": 4251, "p": 0.012232415902140673, "lo": 0.009340660926831348, "hi": 0.01600495946007095, "engine": null}, {"name": "Hyperplastic Frontal Lobe", "count": 315, "n": 4251, "p": 0.07410021171489062, "lo": 0.0666047906251858, "hi": 0.0823647033273035, "engine": 0.08757323465926613}, {"name": "Hypertrophic Pituitary", "count": 586, "n": 4251, "p": 0.13784991766643143, "lo": 0.1278129446288039, "hi": 0.14854084489887198, "engine": 0.16497070613629358}, {"name": "Incubation Sac", "count": 363, "n": 4251, "p": 0.08539167254763586, "lo": 0.07736037257966605, "hi": 0.09417165343042089, "engine": 0.10206598828245453}, {"name": "Lady of the Plague Quarter", "count": 14, "n": 4251, "p": 0.003293342742884027, "lo": 0.0019628158474557234, "hi": 0.0055207999938484496, "engine": null}, {"name": "Nettle Toggle", "count": 61, "n": 4251, "p": 0.014349564808280405, "lo": 0.011187734762646142, "hi": 0.018388360385055712, "engine": null}, {"name": "Pig Iron Bone Saw", "count": 46, "n": 4251, "p": 0.010820983298047518, "lo": 0.008122688499027612, "hi": 0.014402615380674982, "engine": null}, {"name": "Prismatic Liver", "count": 339, "n": 4251, "p": 0.07974594213126324, "lo": 0.07197657614581361, "hi": 0.08827418383547452, "engine": 0.09250693802035151}, {"name": "Rawhide Restraint", "count": 47, "n": 4251, "p": 0.011056222065396377, "lo": 0.008324836048296319, "hi": 0.014670520582606225, "engine": null}, {"name": "Sinew Garrote", "count": 59, "n": 4251, "p": 0.013879087273582686, "lo": 0.010775420531651118, "hi": 0.01786056911365083, "engine": null}, {"name": "Sloughed Cortex", "count": 61, "n": 4251, "p": 0.014349564808280405, "lo": 0.011187734762646142, "hi": 0.018388360385055712, "engine": null}, {"name": "Tanned Leather Restraint", "count": 42, "n": 4251, "p": 0.009880028228652082, "lo": 0.007317859850416452, "hi": 0.013327233024486341, "engine": null}, {"name": "Two-Inch Skull Nail", "count": 49, "n": 4251, "p": 0.011526699600094096, "lo": 0.008730178930956938, "hi": 0.015205283202345507, "engine": null}, {"name": "Vermicular Spinal Cord", "count": 39, "n": 4251, "p": 0.009174311926605505, "lo": 0.00671855863274618, "hi": 0.012516375988556762, "engine": null}]}, {"id": "advanced", "title": "Instruments, rounds 2+", "sub": "Each card in later (advanced) instrument offers", "rows": [{"name": "Aberrant Stinger", "count": 101, "n": 5643, "p": 0.01789828105617579, "lo": 0.014752643972216371, "hi": 0.021699874901342963, "engine": 0.018859312433867924}, {"name": "Beak of the Twice-Born", "count": 101, "n": 5643, "p": 0.01789828105617579, "lo": 0.014752643972216371, "hi": 0.021699874901342963, "engine": 0.018859312433867924}, {"name": "Black Goat Gut Suture", "count": 426, "n": 5643, "p": 0.07549175970228601, "lo": 0.06888388521931046, "hi": 0.08267722816485104, "engine": 0.0754372497354717}, {"name": "Canine Teeth File", "count": 433, "n": 5643, "p": 0.07673223462697147, "lo": 0.0700718760672666, "hi": 0.08396849935250789, "engine": 0.0754372497354717}, {"name": "Clustered Eggs", "count": 465, "n": 5643, "p": 0.08240297713981924, "lo": 0.07550927559435762, "hi": 0.08986486913107615, "engine": 0.0754372497354717}, {"name": "Egg-Burdened Butterfly", "count": 44, "n": 5643, "p": 0.007797270955165692, "lo": 0.005813647274829467, "hi": 0.010450595023024258, "engine": 0.009429656216933962}, {"name": "Eyelid Speculum", "count": 93, "n": 5643, "p": 0.01648059542796385, "lo": 0.013472574055616336, "hi": 0.020146502491528176, "engine": 0.018859312433867924}, {"name": "Fouled Scraper", "count": 449, "n": 5643, "p": 0.07956760588339536, "lo": 0.07278925702255516, "hi": 0.08691800305004897, "engine": 0.0754372497354717}, {"name": "Lady of the Plague Quarter", "count": 93, "n": 5643, "p": 0.01648059542796385, "lo": 0.013472574055616336, "hi": 0.020146502491528176, "engine": 0.018859312433867924}, {"name": "Nettle Toggle", "count": 429, "n": 5643, "p": 0.07602339181286549, "lo": 0.06939295844461102, "hi": 0.08323069581195604, "engine": 0.0754372497354717}, {"name": "Pig Iron Bone Saw", "count": 417, "n": 5643, "p": 0.07389686337054759, "lo": 0.06735726719954543, "hi": 0.08101622356739942, "engine": 0.0754372497354717}, {"name": "Rawhide Restraint", "count": 408, "n": 5643, "p": 0.07230196703880915, "lo": 0.06583157263785479, "hi": 0.07935429551187338, "engine": 0.0754372497354717}, {"name": "Sinew Garrote", "count": 404, "n": 5643, "p": 0.07159312422470317, "lo": 0.06515378990369176, "hi": 0.07861535708282898, "engine": 0.0754372497354717}, {"name": "Sloughed Cortex", "count": 458, "n": 5643, "p": 0.0811625022151338, "lo": 0.07431895105494744, "hi": 0.08857593163487337, "engine": 0.08532334695740576}, {"name": "Tanned Leather Restraint", "count": 448, "n": 5643, "p": 0.07939039517986886, "lo": 0.07261934210353208, "hi": 0.08673373767827018, "engine": 0.0754372497354717}, {"name": "Two-Inch Skull Nail", "count": 443, "n": 5643, "p": 0.0785043416622364, "lo": 0.07176992310804632, "hi": 0.0858122552197467, "engine": 0.0754372497354717}, {"name": "Vermicular Spinal Cord", "count": 431, "n": 5643, "p": 0.07637781321991849, "lo": 0.06973239546923812, "hi": 0.08359961936893266, "engine": 0.0754372497354717}]}, {"id": "rarity", "title": "Starting rarity", "sub": "Each monster on a game\u2019s first board", "rows": [{"name": "normal", "count": 3383, "n": 8366, "p": 0.40437485058570405, "lo": 0.3939044539623231, "hi": 0.4149330275020812, "engine": 0.4036613477587015}, {"name": "magic", "count": 2150, "n": 8366, "p": 0.2569925890509204, "lo": 0.24774176900946257, "hi": 0.2664664807619548, "engine": 0.26087266213939664}, {"name": "rare", "count": 1429, "n": 8366, "p": 0.17081042314128617, "lo": 0.16289737985694955, "hi": 0.17902565008426224, "engine": 0.17068897643684655}, {"name": "boss", "count": 1404, "n": 8366, "p": 0.1678221372220894, "lo": 0.15996688048907778, "hi": 0.17598232074789666, "engine": 0.16477701366505523}]}, {"id": "archetype", "title": "Starting archetype", "sub": "Each monster on a game\u2019s first board", "rows": [{"name": "pest", "count": 2223, "n": 8366, "p": 0.2657183839349749, "lo": 0.2563620698441992, "hi": 0.2752897597435913, "engine": 0.25}, {"name": "aemberon", "count": 1789, "n": 8366, "p": 0.21384174037771933, "lo": 0.2051879712303922, "hi": 0.22275819205183764, "engine": 0.25}, {"name": "boneSentry", "count": 1496, "n": 8366, "p": 0.17881902940473343, "lo": 0.1707554887431046, "hi": 0.18717740212546333, "engine": 0.25}, {"name": "agito", "count": 2858, "n": 8366, "p": 0.34162084628257233, "lo": 0.3315329526677657, "hi": 0.351854126007654, "engine": 0.25}]}]};
+const pct = (v, dp) => (v * 100).toFixed(dp ?? (v < 0.01 ? 2 : 1)) + '%';
+const supreme = new Set(DATA.supremeNames);
+document.getElementById('facts').innerHTML =
+  `<span><b>${DATA.boards.toLocaleString()}</b> boards</span><span><b>${DATA.runs.toLocaleString()}</b> games</span>` +
+  `<span>Supreme potion in an offer slot: <b>${pct(DATA.supreme.p, 2)}</b> live, <b>${pct(DATA.supreme.engine, 1)}</b> simulator</span>` +
+  `<span>Updated <b>${new Date(DATA.generated).toISOString().slice(0, 16).replace('T', ' ')} UTC</b></span>`;
+
+function verdict(r) {
+  if (r.engine === null) return ['none', 'Not in this pool in the simulator'];
+  if (r.engine < r.lo) return ['higher', 'More often than simulated'];
+  if (r.engine > r.hi) return ['lower', 'Less often than simulated'];
+  return ['ok', 'Matches'];
+}
+const nav = document.getElementById('nav');
+const host = document.getElementById('sections');
+const state = {};
+for (const sec of DATA.sections) {
+  state[sec.id] = { key: 'p', dir: -1 };
+  nav.insertAdjacentHTML('beforeend', `<a href="#${sec.id}">${sec.title}</a>`);
+  const n = sec.rows[0]?.n ?? 0;
+  host.insertAdjacentHTML('beforeend', `
+    <section id="${sec.id}">
+      <div class="sec-head"><h2>${sec.title}</h2><span class="sec-sub">${sec.sub} · ${n.toLocaleString()} cards counted</span></div>
+      ${sec.id === 'basic' ? '<p class="note">Advanced instruments also turned up in round 1 offers, at well under 2% each. The simulator never deals them there.</p>' : ''}
+      ${sec.id === 'kit' ? '<p class="note">Only a few Potion Kits were opened in shared games, so these shares are rough.</p>' : ''}
+      <div class="scroll"><table>
+        <thead><tr>
+          <th><button data-k="name">Card</button></th>
+          <th class="num"><button data-k="p">Live</button></th>
+          <th class="chart">Live vs simulator</th>
+          <th class="num"><button data-k="engine">Simulator</button></th>
+          <th class="num"><button data-k="count">Seen</button></th>
+          <th><button data-k="v">Verdict</button></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </section>`);
+}
+const order = { higher: 0, lower: 1, ok: 2, none: 3 };
+function render() {
+  const q = document.getElementById('filter').value.trim().toLowerCase();
+  for (const sec of DATA.sections) {
+    const el = document.getElementById(sec.id);
+    const { key, dir } = state[sec.id];
+    const max = Math.max(...sec.rows.map(r => Math.max(r.hi, r.engine ?? 0))) || 1;
+    const rows = sec.rows.filter(r => !q || r.name.toLowerCase().includes(q)).sort((a, b) => {
+      const va = key === 'v' ? order[verdict(a)[0]] : a[key] ?? -1, vb = key === 'v' ? order[verdict(b)[0]] : b[key] ?? -1;
+      return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * dir;
+    });
+    el.hidden = q && !rows.length;
+    el.querySelectorAll('th').forEach(th => {
+      const b = th.querySelector('button');
+      if (b && b.dataset.k === key) th.setAttribute('aria-sort', dir > 0 ? 'ascending' : 'descending'); else th.removeAttribute('aria-sort');
+    });
+    const x = v => (v / max * 100).toFixed(2) + '%';
+    el.querySelector('tbody').innerHTML = rows.map(r => {
+      const [v, text] = verdict(r);
+      return `<tr>
+        <td class="name">${r.name}${supreme.has(r.name) ? '<span class="tag">Supreme</span>' : ''}</td>
+        <td class="num">${pct(r.p)}</td>
+        <td class="chart"><div class="track" title="Live ${pct(r.p)} (range ${pct(r.lo)}–${pct(r.hi)})${r.engine !== null ? ', simulator ' + pct(r.engine) : ''}">
+          <div class="b" style="width:${x(r.p)}"></div>
+          <div class="ci" style="left:${x(r.lo)};width:${x(r.hi - r.lo)}"></div>
+          ${r.engine !== null ? `<div class="s" style="left:${x(r.engine)}"></div>` : ''}
+        </div></td>
+        <td class="num">${r.engine === null ? '—' : pct(r.engine)}</td>
+        <td class="num">${r.count.toLocaleString()}</td>
+        <td class="verdict v-${v}">${text}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="6" class="empty">No card matches.</td></tr>';
+  }
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('th button');
+  if (!b) return;
+  const id = b.closest('section').id, k = b.dataset.k, s = state[id];
+  state[id] = { key: k, dir: s.key === k ? -s.dir : (k === 'name' ? 1 : -1) };
+  render();
+});
+document.getElementById('filter').addEventListener('input', render);
+render();
+</script>
+
+</body>
+</html>

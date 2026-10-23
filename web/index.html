@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vorax Helper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Big+Shoulders+Stencil+Display:wght@800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="credit">
+    <img class="credit-gif" src="img/vibe.gif" alt="" width="160" height="90">
+    <p class="credit-text">Vibe coded by Timer</p>
+    <img class="credit-pic" src="img/timer.png" alt="Timer" width="68" height="90">
+  </div>
+  <div class="hub">
+    <div>
+      <div class="kicker">Torchlight: Infinite · SS11 · Surgical Preparation</div>
+      <h1 class="title">Vorax</h1>
+      <div class="kicker" style="letter-spacing:.3em">Helper</div>
+      <p class="lede">Enter your board exactly as it is in the game and get the best move, checked by simulating the rest of the run hundreds of times. Built to answer one question: how do I reach my target score as reliably as possible?</p>
+      <div class="cards">
+        <a class="entry primary" href="analyze.html">
+          <div class="row"><h3>Board analyzer</h3><span class="tag">Your position · move advice</span></div>
+          <p>Set the tanks, round, instruments and the cards on offer. Get the best play, and a deep check that ranks every option by its chance of reaching your target.</p>
+        </a>
+        <a class="entry" href="strategy.html">
+          <div class="row"><h3>Strategy guide</h3><span class="tag">5-minute read</span></div>
+          <p>Which instruments to take, when to refresh, and what the simulations say about each build, measured on millions of games.</p>
+        </a>
+        <a class="entry" href="strategy.html#evidence">
+          <div class="row"><h3>The data</h3><span class="tag">Build rankings</span></div>
+          <p>Every instrument pair and trio ranked by the chance of clearing 600k, 700k and 850k.</p>
+        </a>
+        <a class="entry" href="odds.html">
+          <div class="row"><h3>Card odds</h3><span class="tag">Live games vs simulator</span></div>
+          <p>How often each potion and instrument turns up in real games, from about 21,000 shared boards.</p>
+        </a>
+      </div>
+    </div>
+    <div class="showcase">
+      <div class="tanks" id="demo"></div>
+      <div class="cap">A sample board. Click “Board analyzer” to enter yours.</div>
+    </div>
+  </div>
+  <div class="foot">
+    Fan-made and unofficial; not affiliated with the developers or publishers of Torchlight: Infinite.<br>
+    Credits: the original Vorax simulator by Moebing, <a href="https://github.com/Moebing/Torchlight-Infinite-SS11-Vorax-simulator">Torchlight-Infinite-SS11-Vorax-simulator</a> (MIT), used to gather the data ·
+    solver logic from Arcasti's <a href="https://github.com/arcasti/tli-warden">tli-warden</a> ·
+    help with the in-game textures from Sif, <a href="https://github.com/WolfDan/tli-tools">tli-tools</a>.<br>
+    Pictures of your game stay on your PC. The boards it reads are shared to improve the advice unless you turn Share boards off.
+  </div>
+</div>
+<script>
+(function(){
+  var T=[['pest','Pest','magic',5,150],['aemberon','Aemberon','normal',1,36],['boneSentry','Bone Sentry','rare',15,40],['agito','Agito','rare',20,12],['pest','Pest','boss',300,1],null];
+  var L={pest:'P',aemberon:'A',boneSentry:'B',agito:'G'};
+  document.getElementById('demo').innerHTML=T.map(function(t,i){
+    if(!t) return '<div class="tank empty show"><span class="plus">+</span><span class="small">Empty</span></div>';
+    return '<div class="tank show"><span class="n">TANK '+(i+1)+'</span><span class="glyph a-'+t[0]+'">'+L[t[0]]+'</span><span class="name">'+t[1]+'</span><span class="badge r-'+t[2]+'">'+t[2]+'</span><div class="nums">'+t[3]+' × '+t[4]+'<div class="total">'+(t[3]*t[4]).toLocaleString()+'</div></div></div>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

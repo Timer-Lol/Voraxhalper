@@ -1,0 +1,13 @@
+name = "vorax-collector"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "vorax-boards"
+database_id = "<your D1 database id: npx wrangler d1 create vorax-boards>"
+
+# debug reports (players' Ctrl+Alt+J bundles), see SETUP.md
+[[r2_buckets]]
+binding = "REPORTS"
+bucket_name = "vorax-reports"

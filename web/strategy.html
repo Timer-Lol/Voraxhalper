@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Strategy guide · Vorax Helper</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <nav class="nav"><a href="index.html">← Vorax Helper</a><a href="analyze.html">Board analyzer</a><a class="on" href="strategy.html">Strategy guide</a></nav>
+  <div class="kicker">Vorax Helper · Strategy guide</div>
+  <h1 class="title sm">The playbook</h1>
+  <p class="lede">Built from tens of thousands of simulated runs where the bot only ever sees what you would see: your tanks and the cards on offer. Numbers are for the realistic game (random tanks, random offers, Shelley level 6).</p>
+
+  <div class="prose">
+    <h2>Instruments: the part that matters most</h2>
+    <p>Instruments are the biggest lever, and they are chosen at the 8,000 and 28,000 Ultimate Activity thresholds, so the pick can't be redone.</p>
+    <ol>
+      <li><b>First instrument:</b> take <b>Incubation Sac</b>. <b>Claws</b> is an acceptable substitute. If neither is offered, refresh (you have two refreshes).</li>
+      <li><b>Second instrument:</b> refresh until <b>Lady of the Plague Quarter</b> or <b>Beak</b> shows up.</li>
+      <li><b>Third instrument:</b> Sac + Madonna wants <b>Beak</b>; Sac + Beak wants <b>Lady of the Plague Quarter</b>; Claws + Madonna wants <b>Canine Teeth File</b> or <b>Pig Iron Bone Saw</b>.</li>
+    </ol>
+    <div class="callout"><b>Avoid</b> Aberrant Stinger, Nettle Toggle and Two-Inch Skull Nail. They consistently lower the chance of a big finish.</div>
+
+    <h2>Potions</h2>
+    <p>Potion choices are rarely close, so the one-round-ahead answer in the analyzer is usually right. When two options are within a few points, run the deep check: it plays each one to the end of the run and reports the chance of reaching your target, with a confidence range.</p>
+
+    <h2 id="evidence">What the data says</h2>
+    <p>Realistic play, best refresh policy found:</p>
+    <table class="data">
+      <tr><th>Target</th><th>Chance of reaching it</th><th>Notes</th></tr>
+      <tr><td>600,000</td><td>about 65%</td><td>The consistent goal</td></tr>
+      <tr><td>850,000</td><td>about 43%</td><td>Needs a good instrument draw</td></tr>
+    </table>
+    <p>Two findings worth knowing:</p>
+    <ul>
+      <li><b>Build tables are a ceiling, not a plan.</b> Pairs ranked with both instruments equipped from round 1 overrate Claws. Always validate in the dealt (realistic) mode, which is what this guide does.</li>
+      <li><b>Tanks matter less than you'd think for a single pick,</b> but they decide how much a given potion is worth. That's why the analyzer asks for your exact board.</li>
+    </ul>
+    <p class="note">Unproven: a two-round lookahead bot looked about 5 points better at 600k, within noise on 300 games. It needs around 1,500 games to confirm.</p>
+  </div>
+  <div class="foot">Engine and data build on Moebing's MIT-licensed Vorax simulator; see LICENSE. Runs entirely in your browser; nothing is uploaded.</div>
+</div>
+</body>
+</html>

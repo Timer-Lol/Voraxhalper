@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Board analyzer · Vorax Helper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=Big+Shoulders+Stencil+Display:wght@800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="credit">
+    <img class="credit-gif" src="img/vibe.gif" alt="" width="160" height="90">
+    <p class="credit-text">Vibe coded by Timer</p>
+    <img class="credit-pic" src="img/timer.png" alt="Timer" width="68" height="90">
+  </div>
+  <nav class="nav"><a href="index.html">← Vorax Helper</a><a class="on" href="analyze.html">Board analyzer</a><a href="strategy.html">Strategy guide</a><span class="sp"></span><button class="btn" id="setBtn" type="button">⚙ Settings</button></nav>
+  <div class="kicker">Vorax Helper · Board analyzer</div>
+  <h1 class="title sm">What should I do?</h1>
+  <p class="lede">Set your board exactly as it is in the game, then read the advice. The deep check plays each option out to the end of the run many times and ranks them by the chance of reaching your target score.</p>
+
+  <div class="grid2">
+    <div>
+      <section class="panel" id="readPanel">
+        <div class="head"><h2>Read my game</h2><span class="kicker">Skip the typing</span></div>
+        <div class="seg" id="srcTabs" style="margin-bottom:14px"><button data-v="shot" class="on">Screenshot</button><button data-v="live">Live</button><button data-v="manual">Manual</button></div>
+        <div id="srcShot">
+          <label class="drop" id="shotDrop" tabindex="0"><b>Drop a screenshot here, paste one (Ctrl+V), or choose a file</b><span>Full Surgical Preparation screen, any common resolution</span><input type="file" id="shotFile" accept="image/*" hidden></label>
+        </div>
+        <div id="srcLive" hidden>
+          <ol class="steps" id="liveSteps"><li data-s="now">① Connect the game log</li><li data-s="later">② Share the game window</li><li data-s="later">③ Watching</li></ol>
+          <div id="liveBody"></div>
+          <label class="check"><input type="checkbox" id="autoDeep"> Run the deep check automatically (Fast)</label>
+        </div>
+        <div id="srcManual" hidden class="note">Set the board by hand below.</div>
+        <div class="note" id="readStatus" style="margin-top:12px"></div>
+        <div class="check-list" id="readCheck"></div>
+        <div class="dbg"><span class="kicker">Debug</span><span class="note" id="dbgCount"></span><span class="sp"></span><button class="btn" id="dbgSave">Save debug bundle</button><a class="btn" href="review.html">Review</a><button class="btn" id="dbgClear" title="Forget what was recorded">Clear</button></div>
+        <p class="note" style="margin-top:12px">The game window and log never leave your computer. The picture is read here in the browser and discarded. Card names use a text reader that downloads once from a CDN; without it, cards are matched by their pictures.</p>
+      </section>
+      <section class="panel">
+        <div class="head"><h2>Your goal</h2><span class="kicker">What counts as a good run</span></div>
+        <div class="fields">
+          <label class="f">Target score<select id="target"></select></label>
+          <label class="f" id="customWrap" hidden>Custom target<input type="number" id="customTarget" min="1000" step="10000" value="600000"></label>
+          <div class="f">Choosing<div class="seg" id="phase"><button data-v="potion">A potion</button><button data-v="instrument">An instrument</button></div></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="head"><h2>Tanks</h2><span class="kicker">Click a tank to edit</span></div>
+        <div class="tanks" id="tanks"></div>
+        <div id="editor"></div>
+        <div class="thresholds" id="thresholds"></div>
+      </section>
+
+      <section class="panel">
+        <div class="head"><h2>This turn</h2><span class="kicker">Round, refreshes, instruments</span></div>
+        <div class="fields">
+          <label class="f">Round<select id="round"></select></label>
+          <label class="f">Potion refreshes left<select id="potionRefreshes"><option>0</option><option>1</option><option>2</option><option>3</option></select></label>
+          <label class="f">Instrument refreshes left<select id="instrumentRefreshes"><option>0</option><option>1</option><option>2</option></select></label>
+        </div>
+        <div class="fields" style="margin-top:12px" id="instruments"></div>
+      </section>
+
+      <section class="panel">
+        <div class="head"><h2 id="handTitle">Cards on offer</h2><span class="kicker" id="handHint"></span></div>
+        <div class="fields" style="margin-bottom:12px" id="handOpts"></div>
+        <div class="cardrow" id="hand"></div>
+        <div class="note" id="handText" style="margin-top:12px"></div>
+      </section>
+
+      <details class="panel" id="sharePanel">
+        <summary class="head" style="cursor:pointer"><h2>Share boards</h2><span class="kicker" id="shareKicker">Optional</span></summary>
+        <label class="check" style="margin-top:0"><input type="checkbox" id="shareOn"> Record the boards I read</label>
+        <p class="note" id="shareBuilt" hidden style="margin-top:10px">Boards go to the helper’s built-in collector. <a href="#" id="shareOwn">Use my own collector instead</a></p>
+        <div class="fields" id="shareFields" style="margin-top:12px">
+          <label class="f">My collector URL (optional)<input type="url" id="shareUrl" placeholder="https://vorax-collector.you.workers.dev"></label>
+          <label class="f">My key<input type="password" id="shareKey" autocomplete="off"></label>
+        </div>
+        <div class="btns" style="margin-top:12px"><button class="btn" id="shareTest">Test connection</button><button class="btn" id="shareDl">Download my boards</button><button class="btn danger" id="shareClear">Clear</button></div>
+        <div class="note" id="shareStat" style="margin-top:10px"></div>
+        <p class="note">Records the board only: tanks, cards offered, instruments, round, refreshes. Never a picture or any log text, and it only goes to the URL you set. Without a URL, boards stay in this browser until you download them.</p>
+      </details>
+
+      <div class="btns" style="margin-top:18px"><button class="btn" id="example">Load an example</button><button class="btn danger" id="clear">Clear the board</button></div>
+    </div>
+
+    <div class="sticky">
+      <section class="panel">
+        <div class="head"><h2>Advice</h2><span class="kicker" id="adviceKicker"></span></div>
+        <div id="rec"></div>
+        <div id="quickList" style="margin-top:12px"></div>
+        <div id="ahead"></div>
+      </section>
+      <section class="panel" id="deepPanel">
+        <div class="head"><h2>Deep check</h2><span class="kicker">Chance of reaching <span id="tgtLabel"></span></span></div>
+        <div class="fields" style="grid-template-columns:1fr auto;align-items:end">
+          <label class="f">Depth<select id="depth"><option value="30">Fast (30 playouts)</option><option value="60" selected>Standard (60)</option><option value="150">Thorough (150)</option></select></label>
+          <div class="btns"><button class="btn primary" id="run">Run deep check</button><button class="btn" id="stop" hidden>Stop</button></div>
+        </div>
+        <div class="progress" id="progWrap" hidden><i id="prog"></i></div>
+        <div class="note" id="progText"></div>
+        <div id="deepList" style="margin-top:8px"></div>
+        <p class="note" style="margin-top:12px">Each option is followed by the rest of the run played by the validated strategy, on the same random draws. Bars show the chance of reaching your target; the whisker is the 95% range. Close options are genuinely close: a wide whisker means more playouts would be needed to separate them.</p>
+      </section>
+    </div>
+  </div>
+  <div class="foot">Advice comes from simulation, so it is a strong guide and not a guarantee. Rounds 11–13 are instrument-only and change nothing in your score. Runs entirely in your browser.</div>
+</div>
+<script src="js/vorax-workers.js"></script>
+<script src="js/vorax-engine.js"></script>
+
+<dialog id="setDlg" class="sdlg" aria-labelledby="setTitle">
+  <div class="sdlg-head"><h2 id="setTitle">Settings</h2><button class="btn" id="setClose" type="button">Close</button></div>
+  <div class="stabs" id="setTabs" role="tablist"></div>
+  <div class="sbody" id="setBody"></div>
+</dialog>
+<script src="js/zip.js"></script>
+<script src="js/debug.js"></script>
+<script src="js/share-config.js"></script>
+<script src="js/share.js"></script>
+<script src="js/analyze.js"></script>
+<script src="js/settings.js"></script>
+</body>
+</html>
