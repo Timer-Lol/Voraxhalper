@@ -18,6 +18,10 @@
   // 925,000 is the default target: the least that the instruments of rounds 11-13 (the high-risk protocols) can take to
   // rainbow (1,120,000). It replaces 850,000, which was too low; a target the player picked themselves is kept.
   if (S.targetV !== 3) { if (S.targetV !== 2 || S.target === 850000) S.target = 925000; S.targetV = 3; }
+  // (Vorax Helper) the app starts from an empty board, keeping only the player's choices: the board saved from the last
+  // session (its round 10, its three instruments) was advised on until the first picture read, and with three
+  // instruments an instrument offer got "Already full" instead of a pick (player reports, 2026-10-23)
+  if (window.VoraxDesktop) S = (function (old) { var s = fresh(); ['target', 'custom', 'depth', 'instMode', 'instModeV', 'targetV'].forEach(function (k) { if (old[k] !== undefined) s[k] = old[k]; }); return s; })(S);
   function load() { try { var j = localStorage.getItem(KEY); return j ? Object.assign(fresh(), JSON.parse(j)) : null; } catch (e) { return null; } }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* storage unavailable: fine */ } }
   var target = function () { return S.target || S.custom || 600000; };

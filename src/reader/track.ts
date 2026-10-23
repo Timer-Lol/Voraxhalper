@@ -20,6 +20,8 @@ export interface InstrumentTracker {
    *  helper joined mid-game, or missed a picture): read again from every board, and replaced by a clearer reading,
    *  so one bad first picture doesn't fix the wrong instruments for the rest of the game. true: its icon read sure. */
   fromPanel?: (boolean | null)[]
+  /** (Vorax Helper) the highest round read clearly this game: a clear round 1 after it is a new game */
+  maxRound?: number
 }
 
 /** Looks after the pick's first picture before the player is asked: that picture can catch the new icon
@@ -52,7 +54,13 @@ export function trackInstruments(
   trigger?: string,
 ): { tracker: InstrumentTracker; instruments: string[]; rounds: number[]; fields: Record<string, FieldRead>; ask?: PickQuestion; settled: number[] } {
   const s = r.state
-  const start = trigger === 'screen' || (s.phase === 'instrument' && s.round === 1 && s.instruments.length === 0)
+  // (Vorax Helper) a new game: its first instrument offer with an empty panel, or a clear round 1 after a later round
+  // of the game before. A starting item in the panel used to hide the first: the last game's three instruments were
+  // kept, and with three owned no instrument was advised (player reports, 2026-10-23).
+  const roundSure = !!r.fields.round?.sure && s.round !== undefined
+  const again = roundSure && s.round === 1 && (t.maxRound ?? 0) >= 2 && (s.phase === 'instrument' || s.phase === 'potion')
+  const start = trigger === 'screen' || (s.phase === 'instrument' && s.round === 1 && s.instruments.length === 0) || again
+  const maxRound = Math.max(start ? 0 : (t.maxRound ?? 0), roundSure ? s.round! : 0)
   let owned = start ? [] : [...t.owned]
   // a pick comes from the offer before this picture; this picture's offer is for the next pick
   let offer = start ? null : t.offer
@@ -69,7 +77,8 @@ export function trackInstruments(
   // isn't a pick: a starting item, which stays in the oldest slot, or on 16:9 a flask, which the first pick
   // replaces. Later offers can show a new pick beside them.
   const beforeFirstPick = s.phase === 'instrument' && s.round === 1 && owned.length === 0
-  let startItems = start ? 0 : (t.start ?? 0)
+  // a new game noticed on its potion board (its instrument offer missed) keeps the last game's starting items
+  let startItems = start && !(again && s.phase === 'potion') ? 0 : (t.start ?? 0)
   if (beforeFirstPick) startItems = s.instruments.length
   // the first pick didn't add an icon: what was there was the flask, now the pick
   else if (owned.length === 0 && startItems > 0 && offer && s.instruments.length === startItems) startItems = 0
@@ -148,7 +157,19 @@ export function trackInstruments(
     unsure = unsure.filter(q => q.slot < owned.length)
     owned.forEach((n, i) => (fields[`instrument${i}`] = r.fields[`instrument${i + startItems}`] ?? { sure: false, guess: n }))
   }
+  // (Vorax Helper) the game offers an instrument only to a player with fewer than three: three owned beside an offer
+  // is a count gone wrong (the last game's, or a phantom icon), and "already full" would hide the pick. The icons
+  // that read clearly are kept, at most two, and shown to check.
+  if (s.phase === 'instrument' && s.hand.length > 0 && owned.length >= 3 && (s.round ?? 99) <= 10) {
+    const clear = panel.filter((n, i) => n && r.fields[`instrument${i + startItems}`]?.sure).slice(0, 2)
+    owned = clear
+    fromPanel = owned.map(() => false)
+    rounds = owned.map(() => 0)
+    unsure = []
+    for (const k of Object.keys(fields)) delete fields[k]
+    owned.forEach((n, i) => (fields[`instrument${i}`] = { sure: false, guess: n }))
+  }
   rounds = owned.map((_, i) => rounds[i] ?? 0)
   fromPanel = owned.map((_, i) => (fromPanel[i] === undefined ? null : fromPanel[i]))
-  return { tracker: { owned, offer: nextOffer ?? offer, unsure, start: startItems, rounds, fromPanel }, instruments: owned, rounds, fields, settled, ...(ask ? { ask } : {}) }
+  return { tracker: { owned, offer: nextOffer ?? offer, unsure, start: startItems, rounds, fromPanel, maxRound }, instruments: owned, rounds, fields, settled, ...(ask ? { ask } : {}) }
 }
