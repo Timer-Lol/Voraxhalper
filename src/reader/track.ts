@@ -22,6 +22,8 @@ export interface InstrumentTracker {
   fromPanel?: (boolean | null)[]
   /** (Vorax Helper) the highest round read clearly this game: a clear round 1 after it is a new game */
   maxRound?: number
+  /** (Vorax Helper) per instrument taken from the panel: each name it was read as, with its match scores added up */
+  votes?: Record<string, number>[]
 }
 
 /** Looks after the pick's first picture before the player is asked: that picture can catch the new icon
@@ -68,6 +70,7 @@ export function trackInstruments(
   let rounds = start ? [] : [...(t.rounds ?? [])]
   // null: known from a pick or the player; true/false: taken from the panel, and whether that icon read sure
   let fromPanel: (boolean | null)[] = start ? [] : [...(t.fromPanel ?? [])]
+  let votes: Record<string, number>[] = start ? [] : [...(t.votes ?? [])]
   // an owned instrument is sure unless it's a pick the player hasn't confirmed
   const known = (n: string, i: number): FieldRead => (unsure.some(q => q.slot === i) ? { sure: false, guess: n } : { sure: true, guess: n })
   const nextOffer = s.phase === 'instrument' && s.hand.length ? [...s.hand] : null
@@ -111,20 +114,22 @@ export function trackInstruments(
     if (due) ask = { offer: [...due.offer], slot: due.slot }
   }
   if (count === owned.length) {
-    // instruments taken from the panel are read again: a sure reading replaces an unsure one, and an unsure one a
-    // reading that was unsure too when it matches better
+    // (Vorax Helper) instruments taken from the panel are read again on every board, and each slot goes to the name it
+    // was read as most, weighted by match score: one picture with the mouse pointer over an icon read Black Goat Gut
+    // Suture as Contracted Claws, clearly enough to replace it for good, and the advice followed the wrong instrument
+    // (player report, 2026-10-23: Osteolytic Ointment advised beside a 246k tank)
     owned = owned.map((n, i) => {
-      if (fromPanel[i] === undefined || fromPanel[i] === null || fromPanel[i] === true) return n
+      if (fromPanel[i] === undefined || fromPanel[i] === null) return n
       const f = r.fields[`instrument${i + startItems}`], now = panel[i]
       if (!now || !f) return n
-      if (f.sure) { fromPanel[i] = true; return now }
-      return n
-    })
-    // an icon that reads sure now, though taken unsure, is settled; one that reads sure as something else is re-taken
-    owned = owned.map((n, i) => {
-      if (fromPanel[i] !== true) return n
-      const f = r.fields[`instrument${i + startItems}`], now = panel[i]
-      return now && f && f.sure && now !== n ? now : n
+      const v = { ...(votes[i] ?? { [n]: 0 }) }
+      v[now] = (v[now] ?? 0) + Math.max(0.05, f.score ?? (f.sure ? 1 : 0.5))
+      votes[i] = v
+      // a change of name needs more than one picture's worth of lead, so a single odd picture can't flip it
+      const top = Object.entries(v).sort((a, b) => b[1] - a[1])[0][0]
+      const best = top !== n && v[top] - (v[n] ?? 0) < 0.5 ? n : top
+      if (f.sure && now === best) fromPanel[i] = true
+      return best
     })
     owned.forEach((n, i) => (fields[`instrument${i}`] = fromPanel[i] === false ? { sure: false, guess: n } : known(n, i)))
   } else if (count === owned.length + 1 && offer) {
@@ -153,6 +158,7 @@ export function trackInstruments(
     // out of step (joined mid-game, or a missed picture): take the panel as read
     owned = [...panel]
     fromPanel = owned.map((_, i) => !!r.fields[`instrument${i + startItems}`]?.sure)
+    votes = owned.map((n, i) => ({ [n]: Math.max(0.05, r.fields[`instrument${i + startItems}`]?.score ?? 0.5) }))
     rounds = owned.map(() => 0)
     unsure = unsure.filter(q => q.slot < owned.length)
     owned.forEach((n, i) => (fields[`instrument${i}`] = r.fields[`instrument${i + startItems}`] ?? { sure: false, guess: n }))
@@ -171,5 +177,6 @@ export function trackInstruments(
   }
   rounds = owned.map((_, i) => rounds[i] ?? 0)
   fromPanel = owned.map((_, i) => (fromPanel[i] === undefined ? null : fromPanel[i]))
-  return { tracker: { owned, offer: nextOffer ?? offer, unsure, start: startItems, rounds, fromPanel, maxRound }, instruments: owned, rounds, fields, settled, ...(ask ? { ask } : {}) }
+  votes = owned.map((_, i) => (fromPanel[i] === null ? {} : votes[i] ?? {}))
+  return { tracker: { owned, offer: nextOffer ?? offer, unsure, start: startItems, rounds, fromPanel, maxRound, votes }, instruments: owned, rounds, fields, settled, ...(ask ? { ask } : {}) }
 }
