@@ -47,12 +47,21 @@ The overlay is the Windows app's card that sits over the game while you play, so
   helper (Ctrl+Alt+H) and the advice follows.
 - **Buttons**: Snap reads the board again now, Helper opens the full board analyzer, – folds the card to its top bar.
   Drag the card by its top bar to put it anywhere; it remembers where.
-- **The highlight**: numbered, glowing boxes drawn over the game itself on the card to play, the tank(s) to target and
-  Confirm (or Refresh), in order. Your clicks go straight through them.
 - From **round 11** (the protocols) the highlight hides and you finish the run yourself; change it in Settings →
   Overlay & highlight, where you can also hide the card while the game isn't in front.
 - The card and highlight show up in OBS and screenshots (handy for streams), but the helper never reads them
   itself: it only looks at the game window.
+
+### The highlight
+Besides the card, the helper draws the advised move right onto the game screen, so you can play it without reading:
+- **Numbered, glowing boxes** over each spot of the move, in the order you click them: **1** the card to play,
+  **2** the tank(s) to use it on, **3** Confirm. For a refresh it boxes the Refresh button; for an instrument or a
+  protocol pick, the card to take, then Confirm.
+- Boxes labelled **"working it out…"** show the instant answer while the look-ahead is still running; they switch to
+  the final move by themselves when it's done.
+- The boxes are **only drawn**: your clicks go straight through them to the game, and the helper never reads them.
+- From **round 11** (the protocols) the boxes hide and you finish the run yourself.
+- Turn it off, or change the round, in Settings → Overlay & highlight (or the tray icon → Highlight the move).
 
 The overlay updates after every move, from the game's log and from watching the game window. It never clicks or types
 in the game.
