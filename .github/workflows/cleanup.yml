@@ -1,0 +1,19 @@
+# One-off: removes the releases (and their tags) made before the history was rewritten. Deleted again afterwards.
+name: Remove old releases
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/cleanup.yml']
+permissions:
+  contents: write
+jobs:
+  remove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete v1.0.0 and v1.0.1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for t in v1.0.0 v1.0.1; do
+            gh release delete "$t" --cleanup-tag --yes --repo "${{ github.repository }}" || gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$t" || true
+          done

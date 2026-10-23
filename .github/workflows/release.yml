@@ -1,6 +1,7 @@
 # Builds the Windows installer and attaches it to a GitHub release named after desktop/package.json's version
 # (v1.0.0, ...). Runs when that version changes on main (or this file does), on a pushed v* tag, or by hand from the
-# Actions tab. A release that already exists gets the new installer in place of the old one.
+# Actions tab. A release that already exists gets the new installer in place of the old one. The installer is built
+# on a Windows runner (desktop: npm install, npm run dist).
 name: Release
 
 on:
