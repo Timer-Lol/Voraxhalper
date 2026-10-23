@@ -636,7 +636,9 @@ function builtCollector() {
   } catch (e) { return null; }
 }
 let reportStatus = '';
+let reportIssue = null;
 async function sendReport(said = '', agreed = false) {
+  reportIssue = null;
   const c = builtCollector();
   if (!c) return (reportStatus = 'This copy has no collector to send reports to.');
   const b = buildBundle(REPORT_MAX, said);
@@ -654,7 +656,8 @@ async function sendReport(said = '', agreed = false) {
   try {
     const r = await net.fetch(c.url + '/report', { method: 'POST', headers: { 'x-key': c.key, 'content-type': 'application/zip', 'x-note': encodeURIComponent(said.slice(0, 300)), 'x-app': app.getVersion() }, body: b.bytes });
     const j = await r.json().catch(() => ({}));
-    reportStatus = r.ok ? `Report sent. Thank you! (${mb} MB)` : `Not sent: ${j.error || 'the collector said ' + r.status}.`;
+    reportStatus = r.ok ? `Report sent. Thank you! (${mb} MB)${j.issue && j.issue.number ? ` · issue #${j.issue.number}` : ''}` : `Not sent: ${j.error || 'the collector said ' + r.status}.`;
+    reportIssue = r.ok && j.issue && /^https:\/\/github\.com\//.test(j.issue.url || '') ? j.issue.url : null;
   } catch (e) { reportStatus = 'Not sent: ' + (e && e.message ? e.message : e); }
   note('report upload:', reportStatus);
   send('overlay', 'clicker', reportStatus);
@@ -740,12 +743,13 @@ const SETTING_KEYS = {
 function settingsView() {
   return {
     values: Object.fromEntries(Object.keys(SETTING_KEYS).map((k) => [k, settings[k]])),
-    clickStatus, screenFallback: useScreen, koffi: !!win32, reportStatus, canReport: !!builtCollector(), admin: { blocked: adminBlock(), self: win32 ? win32.selfElevated() : null, game: game.admin || null },
+    clickStatus, screenFallback: useScreen, koffi: !!win32, reportStatus, reportIssue, canReport: !!builtCollector(), admin: { blocked: adminBlock(), self: win32 ? win32.selfElevated() : null, game: game.admin || null },
     hotkeys: HOTKEYS, log: logPath, logChosen: !!settings.logPath, game: game.running ? game.title : null, version: app.getVersion(),
   };
 }
 ipcMain.handle('settings:get', (e) => (fromHelper(e) ? settingsView() : null));
-ipcMain.handle('settings:sendReport', async (e, said) => { if (!fromHelper(e)) return null; await sendReport(typeof said === 'string' ? said : ''); return settingsView(); });
+// agreed: the page's Report button, its text saying what is sent (no second question)
+ipcMain.handle('settings:sendReport', async (e, said, agreed) => { if (!fromHelper(e)) return null; await sendReport(typeof said === 'string' ? said : '', agreed === true); return settingsView(); });
 ipcMain.handle('settings:set', (e, key, value) => {
   if (!fromHelper(e) || !(key in SETTING_KEYS)) return null;
   const kind = SETTING_KEYS[key];

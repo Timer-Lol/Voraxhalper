@@ -9,6 +9,9 @@
 //   POST /report          the bundle (a .zip, up to 25 MB)        X-Key: <KEY>   X-Note: what went wrong (optional)
 //   GET  /reports         a page listing them, with download links   ?key=<EXPORT_KEY>   (?format=json for JSON)
 //   GET  /report/<id>     one report's .zip                          ?key=<EXPORT_KEY>   (&delete=1 deletes it)
+// With a GitHub token set (secret GITHUB_TOKEN, and GITHUB_REPO in wrangler.toml, see SETUP.md) each report also opens a
+// GitHub issue: the player's note, the app's version and settings, the board at the time, and the report's id. Never the
+// pictures, the log or anything about the player; the .zip itself stays private here. At most 20 issues a day.
 //
 // Cards the helper didn't recognise (a new potion or instrument, say), sent with board sharing: the title as read and a
 // small picture of the card, so new cards are known early.
@@ -85,7 +88,78 @@ async function report(req, env) {
   const note = cleanNote(req.headers.get('x-note'));
   const appVersion = cleanNote(req.headers.get('x-app')).slice(0, 40);
   await env.REPORTS.put(`reports/${id}.zip`, body, { httpMetadata: { contentType: 'application/zip' }, customMetadata: { note, app: appVersion, size: String(body.byteLength) } });
-  return json({ ok: true, id });
+  let issue = null;
+  try { issue = await openIssue(env, { id, note, appVersion, body, day }); } catch (e) { issue = null; }
+  return json({ ok: true, id, ...(issue ? { issue } : {}) });
+}
+
+// ---------- a GitHub issue for each report (optional) ----------
+const ISSUES_PER_DAY = 20;
+/** The files of a .zip written by the helper (stored, not compressed), by name: { name: Uint8Array }. */
+function unzipStored(buf, want) {
+  const u8 = new Uint8Array(buf), dv = new DataView(buf), out = {}, dec = new TextDecoder();
+  for (let at = 0; at + 30 <= u8.length && dv.getUint32(at, true) === 0x04034b50;) {
+    const method = dv.getUint16(at + 8, true), size = dv.getUint32(at + 18, true), n = dv.getUint16(at + 26, true), extra = dv.getUint16(at + 28, true);
+    const name = dec.decode(u8.subarray(at + 30, at + 30 + n)), start = at + 30 + n + extra;
+    if (method === 0 && want.includes(name)) out[name] = u8.subarray(start, start + size);
+    at = start + size;
+  }
+  return out;
+}
+/** The board a report was about: the moment the player flagged, or else the last board read. */
+function boardOf(events) {
+  let read = null, flag = null;
+  for (const line of events.split('\n')) {
+    if (!line || !line.includes('"board"')) continue;
+    let e; try { e = JSON.parse(line); } catch { continue; }
+    if (e.type === 'flag' && e.board) flag = e.board;
+    else if (e.type === 'read' && e.board) read = e.board;
+  }
+  return flag ? { ...flag, flagged: true } : read;
+}
+// text from players goes into a public issue: no mentions, no links that ping or embed
+const plain = (t, max) => String(t || '').replace(/@/g, '@\u200b').replace(/!\[/g, '[').replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').slice(0, max);
+const cell = (t) => plain(t, 80).replace(/\|/g, '/').replace(/\n/g, ' ');
+async function openIssue(env, { id, note, appVersion, body, day }) {
+  if (!env.GITHUB_TOKEN || !env.GITHUB_REPO) return null;
+  const n = await env.DB.prepare('INSERT INTO report_limits (day, who, n) VALUES (?, ?, 1) ON CONFLICT (day, who) DO UPDATE SET n = n + 1 RETURNING n').bind(day, 'github-issues').first('n');
+  if (n > ISSUES_PER_DAY) return null;
+  const files = unzipStored(body, ['manifest.json', 'events.jsonl']);
+  const dec = new TextDecoder();
+  let m = {}; try { m = JSON.parse(dec.decode(files['manifest.json'] || new Uint8Array())); } catch { m = {}; }
+  const events = files['events.jsonl'] ? dec.decode(files['events.jsonl']) : '';
+  const pictures = (events.match(/"type":\s*"read"/g) || []).length;
+  const b = boardOf(events);
+  const lines = [];
+  // the note as plain text (a code block: no links, pictures or mentions from a stranger's text)
+  lines.push(note ? '```text\n' + plain(note, 300).replace(/`/g, "'") + '\n```' : '_No note given._', '');
+  lines.push('| | |', '|---|---|');
+  lines.push(`| App | ${cell(m.version || appVersion || '?')} |`);
+  if (m.os) lines.push(`| Windows | ${cell(m.os)} |`);
+  if (Array.isArray(m.displays)) lines.push(`| Screens | ${cell(m.displays.map((d) => `${d.size?.[0]}x${d.size?.[1]}${d.scale && d.scale !== 1 ? ' @' + d.scale : ''}`).join(', '))} |`);
+  else if (m.screen) lines.push(`| Screen | ${cell(m.screen.join('x'))}${m.dpr && m.dpr !== 1 ? ' @' + m.dpr : ''} |`);
+  if (!m.app && m.browser) lines.push(`| Browser | ${cell(m.browser)} |`);
+  lines.push(`| Pictures read | ${pictures} |`);
+  if (m.settings) lines.push(`| Settings | ${plain(Object.entries(m.settings).map(([k, v]) => `${k}: ${v}`).join(', '), 600).replace(/\|/g, '/')} |`);
+  if (b) {
+    const tank = (t) => (t ? `${t[1]} ${t[0]} ${t[2]}×${t[3]}` : 'empty');
+    lines.push('', `**Board${b.flagged ? ' when the player flagged it' : ' last read'}:** round ${cell(b.round)}, ${cell(b.phase)} pick`);
+    if (b.hand?.length) lines.push(`- Hand: ${b.hand.map(cell).join(' · ')}`);
+    if (b.inst?.length) lines.push(`- Instruments: ${b.inst.filter(Boolean).map(cell).join(' · ')}`);
+    if (b.tanks) lines.push(`- Tanks: ${b.tanks.map(tank).map(cell).join(' · ')}`);
+  }
+  lines.push('', `Report \`${id}\`: the full report with its pictures is kept privately by the developer.`);
+  const title = `Player report: ${note ? plain(note, 70).replace(/\s+/g, ' ') + (note.length > 70 ? '…' : '') : 'no note (' + day + ')'}`;
+  const post = (labels) => fetch(`https://api.github.com/repos/${env.GITHUB_REPO}/issues`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${env.GITHUB_TOKEN}`, accept: 'application/vnd.github+json', 'user-agent': 'vorax-helper-collector', 'x-github-api-version': '2022-11-28', 'content-type': 'application/json' },
+    body: JSON.stringify({ title, body: lines.join('\n'), ...(labels ? { labels } : {}) }),
+  });
+  let r = await post(['player report']);
+  if (r.status === 422 || r.status === 403) r = await post(null); // a token that can't make the label still opens the issue
+  if (!r.ok) return null;
+  const j = await r.json();
+  return { number: j.number, url: j.html_url };
 }
 async function reportList(req, env, url) {
   if (!canExport(req, env)) return json({ error: 'bad key' }, 401);
@@ -183,7 +257,7 @@ export default {
       const rows = await env.DB.prepare('SELECT data FROM boards ORDER BY id').all();
       return new Response(rows.results.map(r => r.data).join('\n') + '\n', { headers: { 'content-type': 'application/x-ndjson', 'content-disposition': 'attachment; filename="vorax-boards.jsonl"', ...cors() } });
     }
-    if (url.pathname === '/check' && req.method === 'GET') return json({ send: canSend(req, env), export: canExport(req, env), reports: !!env.REPORTS });
+    if (url.pathname === '/check' && req.method === 'GET') return json({ send: canSend(req, env), export: canExport(req, env), reports: !!env.REPORTS, issues: !!(env.GITHUB_TOKEN && env.GITHUB_REPO) });
     if (url.pathname === '/report' && req.method === 'POST') return report(req, env);
     if (url.pathname === '/card' && req.method === 'POST') return card(req, env);
     if (url.pathname === '/cards' && req.method === 'GET') return cardList(req, env, url);

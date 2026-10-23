@@ -24,10 +24,38 @@ Don't run the game or the helper as administrator: Windows then refuses the help
 | Ctrl+Alt+V | show or hide the card over the game |
 | Ctrl+Alt+H | open the helper |
 | Ctrl+Alt+X | read the board now |
-| Ctrl+Alt+J | something went wrong: save a debug bundle to Downloads |
+| Ctrl+Alt+J | something went wrong: save a debug bundle, and send it if you want |
 
 The tray icon (by the clock) has the settings: the advice to show, your target score, game speed, the highlight,
 and from which round you play on your own (round 11, the protocols, by default).
+
+## The overlay
+The overlay is the Windows app's card that sits over the game while you play, so you never have to switch windows.
+
+<img src="docs/overlay-card.png" width="348" alt="The overlay card: round 6, target 925k, next move Spinal Solution - Agito on tank 2, 71% to reach the target, two other options below it">
+
+*(an example card)*
+
+- **Next move** in large letters: the card to take and the tank(s) to use it on, or to refresh, or which instrument
+  or protocol to pick.
+- Under it, **how good it is**: the chance of reaching your target score once the deep check has run, or the
+  look-ahead's expected result before that. Below, the **next-best options** with theirs, so you can see when two
+  moves are close.
+- The top bar shows the **round and your target**. A thin moving line under it means the advice is still being worked
+  out; it updates by itself when it's done.
+- **Warnings** in amber when the reader wasn't sure of something on the board ("check tank 3"): fix it in the
+  helper (Ctrl+Alt+H) and the advice follows.
+- **Buttons**: Snap reads the board again now, Helper opens the full board analyzer, – folds the card to its top bar.
+  Drag the card by its top bar to put it anywhere; it remembers where.
+- **The highlight**: numbered, glowing boxes drawn over the game itself on the card to play, the tank(s) to target and
+  Confirm (or Refresh), in order. Your clicks go straight through them.
+- From **round 11** (the protocols) the highlight hides and you finish the run yourself; change it in Settings →
+  Overlay & highlight, where you can also hide the card while the game isn't in front.
+- The card and highlight show up in OBS and screenshots (handy for streams), but the helper never reads them
+  itself: it only looks at the game window.
+
+The overlay updates after every move, from the game's log and from watching the game window. It never clicks or types
+in the game.
 
 ## What the advice is
 Every option is played out to the end of the run in simulation, from your exact board, and ranked by the score it
@@ -39,7 +67,14 @@ leads to and by the chance of reaching your target (925k by default). The strate
 - **Board sharing is on by default**: the boards the helper reads (tank numbers, card and instrument names, the
   round) are sent to the helper's maker to improve its advice. No pictures, names, accounts or anything about you.
   You're told the first time, and can turn it off in the helper (Share boards).
-- Debug reports (Ctrl+Alt+J) are sent only if you press Send when asked.
+- Problem reports are sent only when you press Send (Report a problem, or Ctrl+Alt+J in a game).
+
+## Reporting a problem
+Something read wrong or the advice looks off? Press **⚑ Report a problem** at the top of the board analyzer, say
+what went wrong in a line, and press Send: the helper's record of the run (its pictures of the game window, what it
+read and advised, your fixes) goes to the developer in one click. During a game, **Ctrl+Alt+J** marks the moment and
+asks on the card whether to send it. Each report also opens an [issue](../../issues) here with your note and the
+board at the time (never the pictures), where you can follow it.
 
 ## Without installing
 Open `web/index.html` in Chrome or Edge: the board analyzer works in the browser too (enter the board, drop a

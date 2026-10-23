@@ -28,6 +28,20 @@
   var board = function (S) { return { round: S.round, phase: S.phase, pr: S.potionRefreshes, ir: S.instrumentRefreshes, handSize: S.handSize, fromBox: S.fromBox, hand: S.hand.slice(0, S.phase === 'potion' ? S.handSize : 3), inst: S.instruments.slice(), tanks: S.tanks.map(function (t) { return t ? [t.archetype, t.rarity, t.activity, t.quantity] : null; }) }; };
 
   var lastRead = null, fixTimer = 0;
+  function pack(extra) {
+    var manifest = {
+      version: VERSION, saved: new Date().toISOString(), started: new Date(started).toISOString(), page: location.pathname.split('/').pop(),
+      browser: navigator.userAgent, screen: [screen.width, screen.height], dpr: window.devicePixelRatio, app: !!D(),
+      events: events.length, frames: frameOrder.length,
+    };
+    var files = [{ name: 'manifest.json', data: JSON.stringify(Object.assign(manifest, extra || {}), null, 2) }, { name: 'events.jsonl', data: events.map(function (e) { return JSON.stringify(e); }).join('\n') + '\n' }];
+    var appLog = D() && D().appLog ? D().appLog().catch(function () { return ''; }) : Promise.resolve('');
+    return Promise.all([appLog].concat(frameOrder.map(function (n) { return frames[n].arrayBuffer().then(function (b) { return { name: n, data: new Uint8Array(b) }; }); }))).then(function (r) {
+      if (r[0]) files.push({ name: 'app-log.txt', data: r[0] });
+      files = files.concat(r.slice(1));
+      return { blob: new Blob([VoraxZip.zip(files)], { type: 'application/zip' }), events: events.length, frames: frameOrder.length };
+    });
+  }
   window.VoraxDebug = {
     VERSION: VERSION,
     event: add,
@@ -58,24 +72,27 @@
         if (diff.length) { add('fix', { of: lastRead.e.n, frame: lastRead.e.frame, diff: diff, board: now }); lastRead.board = now; }
       }, 1500);
     },
+    /** everything as one .zip: { blob, events, frames } */
+    pack: pack,
     /** download everything as one .zip */
     bundle: function (extra) {
-      var manifest = {
-        version: VERSION, saved: new Date().toISOString(), started: new Date(started).toISOString(), page: location.pathname.split('/').pop(),
-        browser: navigator.userAgent, screen: [screen.width, screen.height], dpr: window.devicePixelRatio, app: !!D(),
-        events: events.length, frames: frameOrder.length,
-      };
-      var files = [{ name: 'manifest.json', data: JSON.stringify(Object.assign(manifest, extra || {}), null, 2) }, { name: 'events.jsonl', data: events.map(function (e) { return JSON.stringify(e); }).join('\n') + '\n' }];
-      var appLog = D() && D().appLog ? D().appLog().catch(function () { return ''; }) : Promise.resolve('');
-      return Promise.all([appLog].concat(frameOrder.map(function (n) { return frames[n].arrayBuffer().then(function (b) { return { name: n, data: new Uint8Array(b) }; }); }))).then(function (r) {
-        if (r[0]) files.push({ name: 'app-log.txt', data: r[0] });
-        files = files.concat(r.slice(1));
-        var blob = new Blob([VoraxZip.zip(files)], { type: 'application/zip' });
-        var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      return pack(extra).then(function (p) {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(p.blob);
         a.download = 'vorax-debug-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-') + '.zip'; a.click();
         setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
-        return { events: events.length, frames: frameOrder.length, bytes: blob.size };
+        return { events: p.events, frames: p.frames, bytes: p.blob.size };
       });
+    },
+    /** (Vorax Helper) send everything to the helper's maker (the collector built into this copy, js/share-config.js):
+     *  { ok, issue?, error? }. Only when the player presses Send. */
+    report: function (note, extra) {
+      var C = window.VORAX_SHARE;
+      if (!C || !C.url || !C.key) return Promise.resolve({ ok: false, error: 'this copy has no report address' });
+      add('flag', { note: 'report: ' + String(note || '').slice(0, 300), board: lastRead && lastRead.board });
+      return pack(Object.assign({ note: String(note || '').slice(0, 300) }, extra || {})).then(function (p) {
+        return fetch(C.url.replace(/\/+$/, '') + '/report', { method: 'POST', headers: { 'x-key': C.key, 'content-type': 'application/zip', 'x-note': encodeURIComponent(String(note || '').slice(0, 300)), 'x-app': VERSION }, body: p.blob })
+          .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { return r.ok ? { ok: true, issue: j.issue, bytes: p.blob.size, frames: p.frames } : { ok: false, error: j.error || ('the collector said ' + r.status) }; }); });
+      }).catch(function (e) { return { ok: false, error: e && e.message ? e.message : String(e) }; });
     },
     counts: function () { return { events: events.length, frames: frameOrder.length }; },
     clear: function () { events = []; frames = {}; frameOrder = []; lastRead = null; add('cleared'); },

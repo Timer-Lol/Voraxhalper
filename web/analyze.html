@@ -15,7 +15,7 @@
     <p class="credit-text">Vibe coded by Timer</p>
     <img class="credit-pic" src="img/timer.png" alt="Timer" width="68" height="90">
   </div>
-  <nav class="nav"><a href="index.html">← Vorax Helper</a><a class="on" href="analyze.html">Board analyzer</a><a href="strategy.html">Strategy guide</a><span class="sp"></span><button class="btn" id="setBtn" type="button">⚙ Settings</button></nav>
+  <nav class="nav"><a href="index.html">← Vorax Helper</a><a class="on" href="analyze.html">Board analyzer</a><a href="strategy.html">Strategy guide</a><span class="sp"></span><button class="btn" id="repBtn" type="button" title="Something went wrong? Send it to the helper’s maker in one click">⚑ Report a problem</button><button class="btn" id="setBtn" type="button">⚙ Settings</button></nav>
   <div class="kicker">Vorax Helper · Board analyzer</div>
   <h1 class="title sm">What should I do?</h1>
   <p class="lede">Set your board exactly as it is in the game, then read the advice. The deep check plays each option out to the end of the run many times and ranks them by the chance of reaching your target score.</p>
@@ -118,11 +118,23 @@
   <div class="stabs" id="setTabs" role="tablist"></div>
   <div class="sbody" id="setBody"></div>
 </dialog>
+<dialog id="repDlg" class="sdlg rdlg" aria-labelledby="repTitle">
+  <div class="sdlg-head"><h2 id="repTitle">Report a problem</h2><button class="btn" id="repClose" type="button">Close</button></div>
+  <div class="sbody">
+    <label class="rlab" for="repNote">What went wrong? <span>(optional, but it helps)</span></label>
+    <textarea id="repNote" maxlength="300" rows="3" placeholder="For example: tank 5 was read as full while it was empty; the advice didn’t change after my move"></textarea>
+    <p class="note" id="repWhat"></p>
+    <div class="btns"><button class="btn primary" id="repSend" type="button">Send report</button><button class="btn" id="repFile" type="button">Save to a file instead</button></div>
+    <p class="note" id="repStatus" aria-live="polite"></p>
+    <p class="note">Tip: report right after it goes wrong, so the pictures show it. In the app, <b>Ctrl+Alt+J</b> marks the moment during a game and asks to send.</p>
+  </div>
+</dialog>
 <script src="js/zip.js"></script>
 <script src="js/debug.js"></script>
 <script src="js/share-config.js"></script>
 <script src="js/share.js"></script>
 <script src="js/analyze.js"></script>
 <script src="js/settings.js"></script>
+<script src="js/report.js"></script>
 </body>
 </html>

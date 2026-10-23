@@ -53,3 +53,17 @@ read, and a small picture of it. After updating `worker.js`, run once in this fo
 `npx wrangler d1 execute vorax-boards --remote --file=schema.sql` and `npx wrangler deploy`.
 See them at `https://YOUR-URL/cards?key=YOUR-EXPORT-KEY` (most seen first). Pictures are kept in the same R2 bucket
 as the reports; without R2 only the titles are kept.
+
+## Reports as GitHub issues (optional)
+Each report can also open an issue on the helper's GitHub page, so you see problems come in there. The issue has the
+player's note, the app version, their screens and settings, and the board at the time; never the pictures, the log
+or anything about the player (the full report stays private in R2, at `/reports`). At most 20 issues a day.
+
+1. On GitHub: your picture → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** →
+   Generate new token. Repository access: **Only select repositories** → Voraxhalper. Permissions → Repository
+   permissions → **Issues: Read and write**. Pick an expiry (it stops working after it), then Generate, and copy it.
+2. In this `worker/` folder: `npx wrangler secret put GITHUB_TOKEN` (paste the token when asked).
+3. The repository is set in `wrangler.toml` (`GITHUB_REPO`). Run `npx wrangler deploy`.
+
+`/check?key=...` shows `"issues": true` once it's on. Issues get the label "player report" when the token may make it.
+To stop: `npx wrangler secret delete GITHUB_TOKEN`.
