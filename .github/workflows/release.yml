@@ -1,0 +1,45 @@
+# Builds the Windows installer and attaches it to a GitHub release.
+# Runs when a version tag (v1.0.0, v1.0.1, ...) is pushed, or by hand from the Actions tab.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to build and publish (for example v1.0.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install the app's parts
+        working-directory: desktop
+        run: npm install --no-audit --no-fund
+      - name: Build the installer
+        working-directory: desktop
+        run: npm run dist
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: Vorax Helper ${{ github.event.inputs.tag || github.ref_name }}
+          files: desktop/dist/Vorax-Helper-Setup.exe
+          body: |
+            Download **Vorax-Helper-Setup.exe** below and run it. It installs for your Windows user only (no administrator
+            prompt) and adds a desktop and Start menu shortcut. Windows SmartScreen may warn that the installer isn't
+            signed: click **More info → Run anyway**.
+
+            Before your first game: in Torchlight: Infinite press Esc → Account Related → **Enable Log**, then log out and
+            back in, and play windowed or borderless. See the README for hotkeys and settings.
+
+            The helper only reads the game and advises; it never clicks or types in the game.
