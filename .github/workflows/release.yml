@@ -1,15 +1,14 @@
-# Builds the Windows installer and attaches it to a GitHub release.
-# Runs when a version tag (v1.0.0, v1.0.1, ...) is pushed, or by hand from the Actions tab.
+# Builds the Windows installer and attaches it to a GitHub release named after desktop/package.json's version
+# (v1.0.0, ...). Runs when that version changes on main (or this file does), on a pushed v* tag, or by hand from the
+# Actions tab. A release that already exists gets the new installer in place of the old one.
 name: Release
 
 on:
   push:
+    branches: [main]
+    paths: ['desktop/package.json', '.github/workflows/release.yml']
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag to build and publish (for example v1.0.0)'
-        required: true
 
 permissions:
   contents: write
@@ -22,6 +21,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Version
+        id: v
+        shell: bash
+        run: echo "tag=v$(node -p "require('./desktop/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Install the app's parts
         working-directory: desktop
         run: npm install --no-audit --no-fund
@@ -31,8 +34,9 @@ jobs:
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: Vorax Helper ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ steps.v.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: Vorax Helper ${{ steps.v.outputs.tag }}
           files: desktop/dist/Vorax-Helper-Setup.exe
           body: |
             Download **Vorax-Helper-Setup.exe** below and run it. It installs for your Windows user only (no administrator
