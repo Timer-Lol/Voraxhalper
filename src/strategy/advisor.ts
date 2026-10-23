@@ -226,6 +226,12 @@ export function conclude(p: Exclude<Prepared, { advice: Advice }>, tallies: Tall
   let refreshEnd: Advice['refreshEnd']
   if (w.kind === 'potion') {
     const ahead = w.opts.map((c, i) => ({ o: c.o, goal: tallies[i].goal / tallies[i].n, reached: tallies[i].reached / tallies[i].n, v: tallies[i].v })).sort((a, b) => b.goal - a.goal)
+    // (Vorax Helper) of the moves as good as the best by score, the one whose futures reach the target most often:
+    // on 58 of 300 mid-run boards this changed the pick, reaching 950k 1.8 points more often (±1.3) for the same
+    // score (-3.0k ±3.7). Seen live: Targeted Xeno-Hormone on a Boss (59% of futures to 950k) tied with the same on a
+    // small Normal tank (77%)
+    const lead = ahead.filter(a => a === ahead[0] || asGood(ahead[0].v, a.v)).reduce((a, b) => (b.reached > a.reached ? b : a), ahead[0])
+    if (lead !== ahead[0]) ahead.splice(ahead.indexOf(lead), 1), ahead.unshift(lead)
     const reroll = ahead.find(a => a.o[0].type === 'refresh')
     if (reroll) refreshEnd = { activity: reroll.goal, reached: reroll.reached }
     ranking = markNoEffect(s, ahead.filter(a => a !== reroll).map(a => ({ ...toRanked(a.o, Math.round(a.goal)), end: { activity: a.goal, reached: a.reached }, _v: a.v })))

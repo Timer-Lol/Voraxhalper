@@ -355,10 +355,15 @@ export function lookAhead(s: GameState, seed: number, la: LookAhead): Ahead[] {
     }
   }
   // options dropped early keep their estimate from fewer futures, below the ones kept
-  return runs
-    .map(r => ({ o: r.c.o, now: r.c.v, goal: mean(r), reached: r.reached / r.n, n: r.n }))
+  const out = runs
+    .map(r => ({ o: r.c.o, now: r.c.v, goal: mean(r), reached: r.reached / r.n, n: r.n, v: r.v }))
     .sort((a, b) => (la.halving ? b.n - a.n : 0) || b.goal - a.goal)
-    .map(a => ({ o: a.o, now: a.now, goal: a.goal, reached: a.reached }))
+  // (Vorax Helper) of the options as good as the best, the one reaching the target most often (as the advisor does)
+  if (la.settle && out.length > 1) {
+    const lead = out.filter(a => a === out[0] || asGood(out[0].v, a.v)).reduce((a, b) => (b.reached > a.reached ? b : a), out[0])
+    if (lead !== out[0]) out.splice(out.indexOf(lead), 1), out.unshift(lead)
+  }
+  return out.map(a => ({ o: a.o, now: a.now, goal: a.goal, reached: a.reached }))
 }
 
 /** lookAhead's best option; `value` stays this round's expected score, which finish() compares with the board to decide on a refresh. */
