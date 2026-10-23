@@ -137,7 +137,7 @@
     setTimeout(function () {
       if (tok !== aheadToken) return;
       try {
-        if (V.ahead) V.ahead(x, FUT).then(settle, oops);
+        if (V.ahead) V.ahead(x, FUT, SPEED === 'fastest' ? 0 : undefined).then(settle, oops);
         else settle(S.phase === 'instrument' ? V.instrumentAhead(x) : V.plan(x));
       } catch (e) { oops(); }
     }, 30);

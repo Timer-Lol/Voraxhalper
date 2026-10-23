@@ -2,7 +2,7 @@
 import { POTIONS, isBox } from '@/data/potions'
 import { INSTRUMENTS } from '@/data/instruments'
 import { HOLY_WATER_RITES, XENOPANACEA } from '@/data/xenopanacea'
-import { addTallies, advise, conclude, prepare, toState, type Advice, type ScreenState, type Work } from '@/strategy/advisor'
+import { addSettled, addTallies, advise, conclude, prepare, settleWork, toState, type Advice, type ScreenState, type Work } from '@/strategy/advisor'
 import { canRefresh, ultimateActivity } from '@/engine/game'
 import { evChooser, finish, options, play, type Tally } from '@/strategy/bot'
 import { boardValue } from '@/strategy/value'
@@ -230,18 +230,33 @@ export function cancelAhead() {
  * The whole-run look-ahead for a potion or an instrument offer, its futures played over the CPU's cores in small slices
  * (64 per option, from 8 threads up). The same answer as plan() on one thread, sooner. Null when a newer board replaced it.
  */
-/** futures: (Vorax Helper) how many per option, when the player's game speed asks for fewer than this PC's usual */
-export async function ahead(x: HelperInput, futures?: number): Promise<Advice | null> {
+/** futures: (Vorax Helper) how many per option, when the player's game speed asks for fewer than this PC's usual.
+ *  settle: how many times as many futures again the options as good as the best get before one is picked
+ *  (LOOK_AHEAD.settle; 0 leaves a close call as the first futures had it, the fastest game speed). */
+export async function ahead(x: HelperInput, futures?: number, settle?: number): Promise<Advice | null> {
   cancelAhead()
   const tag = currentTag
   const p0 = startPool()
   if (!p0) return advise(x, 16, true)
   const p = prepare(x, futures ?? futuresFor(p0.workers.length + 1))
   if ('advice' in p) return p.advice
-  const n = p.work.futures, k = Math.min(p0.workers.length * 4, n)
-  const run = (from: number, to: number) => new Promise<Tally[] | null>(done => { p0.queue.push({ id: ++p0.ids, slice: { work: p.work, from, to }, done, tag }); next() })
-  const parts = await Promise.all(Array.from({ length: k }, (_, i) => run(Math.floor((i * n) / k), Math.floor(((i + 1) * n) / k))))
-  return parts.some(t => t === null) ? null : conclude(p, addTallies(parts as Tally[][]))
+  const k = p0.workers.length * 4
+  const runAll = async (work: Work, from: number, to: number) => {
+    const n = to - from, parts = Math.min(k, n)
+    const run = (a: number, b: number) => new Promise<Tally[] | null>(done => { p0.queue.push({ id: ++p0.ids, slice: { work, from: a, to: b }, done, tag }); next() })
+    const got = await Promise.all(Array.from({ length: parts }, (_, i) => run(from + Math.floor((i * n) / parts), from + Math.floor(((i + 1) * n) / parts))))
+    return got.some(t => t === null) ? null : addTallies(got as Tally[][])
+  }
+  let tallies = await runAll(p.work, 0, p.work.futures)
+  if (!tallies) return null
+  // (Vorax Helper) a close call (options the futures can't tell apart) is played out further before one is picked
+  const more = settleWork(p, tallies, settle)
+  if (more) {
+    const extra = await runAll(more.work, more.from, more.to)
+    if (!extra) return null
+    tallies = addSettled(tallies, more.idx, extra)
+  }
+  return conclude(p, tallies)
 }
 
 /**

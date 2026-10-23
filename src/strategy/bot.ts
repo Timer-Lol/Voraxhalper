@@ -262,6 +262,31 @@ export interface LookAhead {
    * least 2) 16 more, the best 2 another 32, so close calls get the most futures.
    */
   halving?: boolean
+  /**
+   * (Vorax Helper) Options the futures can't tell apart from the best (asGood) are played this many times more
+   * futures each, then the best mean is taken. On 480 mid-run boards, against picks checked on 600 other futures:
+   * +2.4k (±1.2k) where it changed something (+1.2k with once as many again), while taking the as-good option worth
+   * most this round instead lost 10.5k (±2.6k): the futures see what this round's score doesn't, but 64 of them leave
+   * close calls to luck.
+   */
+  settle?: number
+}
+
+/** (Vorax Helper) Whether two options' futures can't tell them apart: their mean difference, future by future, within
+ *  1.96 standard errors (tli-warden's also_good). Unknown (false) with fewer than 8 futures in common. */
+export function asGood(a?: [number, number][], b?: [number, number][]): boolean {
+  if (!a || !b) return false
+  const m = new Map(a)
+  let n = 0, sum = 0, sq = 0
+  for (const [k, y] of b) {
+    const x = m.get(k)
+    if (x === undefined) continue
+    const d = x - y
+    n++; sum += d; sq += d * d
+  }
+  if (n < 8) return false
+  const mean = sum / n
+  return Math.abs(mean) <= 1.96 * Math.sqrt(Math.max(0, sq / n - mean * mean) / n)
 }
 
 /** One option played to the end: this round's expected score, and over its futures the mean score counted
@@ -306,12 +331,13 @@ export function potionFutures(s: GameState, seed: number, la: LookAhead, opts: A
 }
 
 export function lookAhead(s: GameState, seed: number, la: LookAhead): Ahead[] {
-  const runs = shortlist(s, seed, la).map(c => ({ c, n: 0, goal: 0, reached: 0 }))
+  const runs = shortlist(s, seed, la).map(c => ({ c, n: 0, goal: 0, reached: 0, v: [] as [number, number][] }))
   const playMore = (r: (typeof runs)[number], n: number) => {
     const [t] = potionFutures(s, seed, la, [r.c.o], r.n, r.n + n)
     r.goal += t.goal
     r.reached += t.reached
     r.n += n
+    r.v.push(...(t.v ?? []))
   }
   const mean = (r: (typeof runs)[number]) => r.goal / r.n
   if (la.halving) {
@@ -320,11 +346,18 @@ export function lookAhead(s: GameState, seed: number, la: LookAhead): Ahead[] {
       for (const r of alive) playMore(r, n)
       if (keep) alive = [...alive].sort((a, b) => mean(b) - mean(a)).slice(0, keep)
     }
-  } else for (const r of runs) playMore(r, la.playouts)
+  } else {
+    for (const r of runs) playMore(r, la.playouts)
+    if (la.settle) {
+      const best = runs.reduce((a, b) => (mean(b) > mean(a) ? b : a))
+      const tied = runs.filter(r => r !== best && asGood(best.v, r.v))
+      if (tied.length) for (const r of [best, ...tied]) playMore(r, la.playouts * la.settle)
+    }
+  }
   // options dropped early keep their estimate from fewer futures, below the ones kept
   return runs
     .map(r => ({ o: r.c.o, now: r.c.v, goal: mean(r), reached: r.reached / r.n, n: r.n }))
-    .sort((a, b) => b.n - a.n || b.goal - a.goal)
+    .sort((a, b) => (la.halving ? b.n - a.n : 0) || b.goal - a.goal)
     .map(a => ({ o: a.o, now: a.now, goal: a.goal, reached: a.reached }))
 }
 

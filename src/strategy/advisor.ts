@@ -5,7 +5,8 @@ import { INSTRUMENTS } from '@/data/instruments'
 import { canRefresh, cardChanges, createGame, DEFAULT_SETTINGS, ultimateActivity } from '@/engine/game'
 import type { Action, Archetype, Card, GameState, Monster, Rarity } from '@/engine/types'
 import { settingsForShelley } from '@/data/shelley'
-import { evChooser, expected, instrumentFutures, options, potionFutures, shortlist, type InstrumentChoice, type LookAhead, type Tally } from './bot'
+import { asGood, evChooser, expected, instrumentFutures, options, potionFutures, shortlist, type InstrumentChoice, type LookAhead, type Tally } from './bot'
+export { asGood }
 
 export interface ScreenMonster { archetype: Archetype; rarity: Rarity; activity: number; quantity: number }
 export interface ScreenState {
@@ -121,7 +122,7 @@ export function toState(x: ScreenState, unknown: string[]): GameState {
  *  64 futures rather than 32, with instruments judged up to 950k (INSTRUMENT_FUTURES): 63.9% of 360 simulated games reached 950k
  *  against 58.6%. The rounds and instrument offers inside are played by the smarter player (value: the board value,
  *  src/strategy/value.ts), which replaces the steer. */
-export const LOOK_AHEAD: LookAhead = { top: 4, playouts: 64, steer: 0.3, value: true }
+export const LOOK_AHEAD: LookAhead = { top: 4, playouts: 64, steer: 0.3, value: true, settle: 2 }
 
 /** Futures per instrument choice, each judged by its final score counted up to 950k (64 rather than 32: 152 of 240
  *  simulated games reached 950k against 143; spread over the CPU cores it still answers in about a second). */
@@ -188,22 +189,24 @@ export function playWork(w: Work, from: number, to: number): Tally[] {
 export const addTallies = (parts: Tally[][]): Tally[] =>
   parts[0].map((_, i) => parts.reduce<Tally>((t, p) => ({ goal: t.goal + p[i].goal, reached: t.reached + p[i].reached, n: t.n + p[i].n, v: [...t.v!, ...(p[i].v ?? [])] }), { goal: 0, reached: 0, n: 0, v: [] }))
 
-/** (Vorax Helper) Whether two options' futures can't tell them apart: their mean difference, future by future, within
- *  1.96 standard errors (tli-warden's also_good). Unknown (false) with fewer than 8 futures in common. */
-export function asGood(a?: [number, number][], b?: [number, number][]): boolean {
-  if (!a || !b) return false
-  const m = new Map(a)
-  let n = 0, sum = 0, sq = 0
-  for (const [k, y] of b) {
-    const x = m.get(k)
-    if (x === undefined) continue
-    const d = x - y
-    n++; sum += d; sq += d * d
-  }
-  if (n < 8) return false
-  const mean = sum / n
-  return Math.abs(mean) <= 1.96 * Math.sqrt(Math.max(0, sq / n - mean * mean) / n)
+/** (Vorax Helper) The futures that settle a close call: the options as good as the best (asGood) played `settle` times
+ *  as many futures again (LOOK_AHEAD.settle, measured there), or null when the best stands clear. Run them like the
+ *  first ones (playWork) and add them with addSettled. */
+export function settleWork(p: Exclude<Prepared, { advice: Advice }>, tallies: Tally[], settle = LOOK_AHEAD.settle ?? 0): { work: Work; idx: number[]; from: number; to: number } | null {
+  if (!settle) return null
+  const w = p.work
+  const mean = (t: Tally) => t.goal / t.n
+  const best = tallies.reduce((a, t, i) => (mean(t) > mean(tallies[a]) ? i : a), 0)
+  const tied = tallies.flatMap((t, i) => (i !== best && asGood(tallies[best].v, t.v) ? [i] : []))
+  if (!tied.length) return null
+  const idx = [best, ...tied]
+  const from = w.futures, to = w.futures + w.futures * settle
+  const work: Work = w.kind === 'potion' ? { ...w, opts: idx.map(i => w.opts[i]) } : { ...w, choices: idx.map(i => w.choices[i]) }
+  return { work, idx, from, to }
 }
+/** The first futures with the settling ones added, option by option. */
+export const addSettled = (tallies: Tally[], idx: number[], extra: Tally[]): Tally[] =>
+  tallies.map((t, i) => { const j = idx.indexOf(i); return j < 0 ? t : addTallies([[t], [extra[j]]])[0] })
 
 /** Marks the options as good as the advised one, and drops the futures they were judged on. */
 function markEven(best: Advice['best'], ranking: (Ranked & { _v?: [number, number][] })[]): { ranking: Ranked[]; allEven: boolean } {
