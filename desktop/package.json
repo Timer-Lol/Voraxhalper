@@ -1,7 +1,7 @@
 {
   "name": "vorax-helper-overlay",
   "productName": "Vorax Helper",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Vorax Helper as a Windows app, with its advice in a small card over the game.",
   "license": "MIT",
   "private": true,
@@ -12,7 +12,8 @@
     "dist": "npm run copy-web && electron-builder --win --publish never"
   },
   "dependencies": {
-    "koffi": "2.16.3"
+    "koffi": "2.16.3",
+    "electron-updater": "^6.3.9"
   },
   "devDependencies": {
     "electron": "44.5.1",
@@ -49,6 +50,13 @@
       "oneClick": true,
       "perMachine": false,
       "artifactName": "Vorax-Helper-Setup.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Timer-Lol",
+        "repo": "Voraxhalper"
+      }
+    ]
   }
 }

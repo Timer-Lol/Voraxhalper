@@ -734,6 +734,33 @@ ipcMain.on('plan', (e, p) => {
   highlighter.setPlan(p);
   updateMark();
 });
+// ---------- Updates: the installed app fetches new versions from the GitHub releases by itself ----------
+// Checked a little after the start and every 6 hours; a new version downloads in the background and installs when the
+// app quits (or at once from the tray's "Restart to update"). Running from source (npm start) never updates.
+let updater = null, updateReady = null, updateStatus = '';
+function startUpdates() {
+  if (!app.isPackaged) return;
+  try { updater = require('electron-updater').autoUpdater; } catch (e) { note('updates unavailable:', e.message); return; }
+  updater.logger = { info: (m) => note('update:', m), warn: (m) => note('update:', m), error: (m) => note('update error:', m), debug: () => {} };
+  updater.autoDownload = true;
+  updater.autoInstallOnAppQuit = true;
+  updater.on('checking-for-update', () => { updateStatus = 'Checking for updates…'; });
+  updater.on('update-not-available', () => { updateStatus = `Up to date (version ${app.getVersion()}).`; });
+  updater.on('update-available', (i) => { updateStatus = `Downloading version ${i.version}…`; rebuildMenu(); });
+  updater.on('update-downloaded', (i) => {
+    updateReady = i.version;
+    updateStatus = `Version ${i.version} is ready: it installs when you quit, or now with "Restart to update" in the tray.`;
+    send('overlay', 'clicker', `Update ${i.version} downloaded: it installs when you quit Vorax Helper.`);
+    rebuildMenu();
+  });
+  updater.on('error', (e) => { updateStatus = 'Couldn’t check for updates: ' + String((e && e.message) || e).split('\n')[0].slice(0, 160); });
+  const check = () => updater.checkForUpdates().catch((e) => note('update check failed:', String((e && e.message) || e).slice(0, 200)));
+  setTimeout(check, 20000);
+  setInterval(check, 6 * 3600 * 1000);
+}
+function checkUpdatesNow() { if (updater) return updater.checkForUpdates().catch(() => {}); updateStatus = app.isPackaged ? 'Updates are unavailable in this copy.' : 'Updates come with the installed app (not when run from source).'; }
+function restartToUpdate() { if (!updater || !updateReady) return; quitting = true; setImmediate(() => updater.quitAndInstall(true, true)); }
+
 // ---------- Settings, shown in the helper page's Settings panel ----------
 
 const SETTING_KEYS = {
@@ -744,7 +771,7 @@ function settingsView() {
   return {
     values: Object.fromEntries(Object.keys(SETTING_KEYS).map((k) => [k, settings[k]])),
     clickStatus, screenFallback: useScreen, koffi: !!win32, reportStatus, reportIssue, canReport: !!builtCollector(), admin: { blocked: adminBlock(), self: win32 ? win32.selfElevated() : null, game: game.admin || null },
-    hotkeys: HOTKEYS, log: logPath, logChosen: !!settings.logPath, game: game.running ? game.title : null, version: app.getVersion(),
+    hotkeys: HOTKEYS, log: logPath, logChosen: !!settings.logPath, game: game.running ? game.title : null, version: app.getVersion(), update: { status: updateStatus, ready: updateReady, packaged: app.isPackaged },
   };
 }
 ipcMain.handle('settings:get', (e) => (fromHelper(e) ? settingsView() : null));
@@ -774,6 +801,8 @@ ipcMain.handle('settings:do', async (e, what) => {
   else if (what === 'records') { fs.mkdirSync(RECORDS, { recursive: true }); shell.openPath(RECORDS); }
   else if (what === 'appLog') shell.openPath(LOG_FILE);
   else if (what === 'review') openReview();
+  else if (what === 'checkUpdates') await checkUpdatesNow();
+  else if (what === 'restartUpdate') restartToUpdate();
   rebuildMenu();
   return settingsView();
 });
@@ -795,6 +824,7 @@ function rebuildMenu() {
     { label: 'Something went wrong: save a debug bundle', accelerator: HOTKEYS.report, click: () => reportNow() },
     { label: 'Send a debug report to the developer…', click: () => { showHelper(); send('helper', 'openSettings', 'app'); } },
     { type: 'separator' },
+    ...(updateReady ? [{ label: `Restart to update to version ${updateReady}`, click: restartToUpdate }] : []),
     { label: `Vorax Helper ${app.getVersion()}`, enabled: false },
     { label: 'Quit', click: () => { quitting = true; app.quit(); } },
   ]));
@@ -875,6 +905,7 @@ app.whenReady().then(async () => {
   tray.on('click', showHelper);
   rebuildMenu();
   registerHotkeys();
+  startUpdates();
   await refreshLog();
   lookForGame();
   wins.helper.once('ready-to-show', showHelper);
