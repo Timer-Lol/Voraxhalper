@@ -9,6 +9,7 @@
 //   POST /report          the bundle (a .zip, up to 25 MB)        X-Key: <KEY>   X-Note: what went wrong (optional)
 //   GET  /reports         a page listing them, with download links   ?key=<EXPORT_KEY>   (?format=json for JSON)
 //   GET  /report/<id>     one report's .zip                          ?key=<EXPORT_KEY>   (&delete=1 deletes it)
+//   POST /reports/delete  several at once (the reports page's ticked boxes)   form: key=<EXPORT_KEY>, id=..., id=...
 // With a GitHub token set (secret GITHUB_TOKEN, and GITHUB_REPO in wrangler.toml, see SETUP.md) each report also opens a
 // GitHub issue: the player's note, the app's version and settings, the board at the time, and the report's id. Never the
 // pictures, the log or anything about the player; the .zip itself stays private here. At most 20 issues a day.
@@ -174,9 +175,23 @@ async function reportList(req, env, url) {
   items.sort((a, b) => (a.uploaded < b.uploaded ? 1 : -1));
   if (url.searchParams.get('format') === 'json') return json(items);
   const k = encodeURIComponent(keyOf(req));
-  const rows = items.map((r) => `<tr><td>${esc(r.uploaded.replace('T', ' ').slice(0, 16))}</td><td>${(r.size / 1048576).toFixed(1)} MB</td><td>${esc(r.app)}</td><td>${esc(r.note) || '<i>no note</i>'}</td><td><a href="/report/${esc(r.id)}?key=${k}">Download</a> · <a href="/report/${esc(r.id)}?key=${k}&delete=1" onclick="return confirm('Delete this report?')">Delete</a></td></tr>`).join('');
-  const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vorax Helper reports</title><style>body{font:14px system-ui,sans-serif;margin:24px;background:#0c1119;color:#c5cddb}table{border-collapse:collapse;width:100%}td,th{padding:6px 10px;border-bottom:1px solid #26344d;text-align:left;vertical-align:top}a{color:#54c7b0}h1{font-size:20px;color:#e9ddc2}</style><h1>Debug reports (${items.length})</h1><table><tr><th>Sent (UTC)</th><th>Size</th><th>App</th><th>Note</th><th></th></tr>${rows}</table>`;
+  const rows = items.map((r) => `<tr><td><input type="checkbox" name="id" value="${esc(r.id)}" data-t="${esc(r.uploaded)}"></td><td>${esc(r.uploaded.replace('T', ' ').slice(0, 16))}</td><td>${(r.size / 1048576).toFixed(1)} MB</td><td>${esc(r.app)}</td><td>${esc(r.note) || '<i>no note</i>'}</td><td><a href="/report/${esc(r.id)}?key=${k}">Download</a> · <a href="/report/${esc(r.id)}?key=${k}&delete=1" onclick="return confirm('Delete this report?')">Delete</a></td></tr>`).join('');
+  const done = url.searchParams.get('deleted');
+  // (Vorax Helper) ticking reports to download or delete together: "Delete selected" posts them to /reports/delete
+  const bar = `<div class="bar"><label><input type="checkbox" id="all"> All</label><button type="button" id="old">Select older than 7 days</button><button type="button" id="dl">Download selected</button><button type="submit" id="del" class="danger">Delete selected</button><span id="n">0 selected</span></div>`;
+  const script = `<script>(function(){var f=document.getElementById('f'),box=function(){return Array.prototype.slice.call(f.querySelectorAll('input[name=id]'))},sel=function(){return box().filter(function(b){return b.checked})},count=function(){document.getElementById('n').textContent=sel().length+' selected'};f.addEventListener('change',count);document.getElementById('all').onchange=function(){var on=this.checked;box().forEach(function(b){b.checked=on});count()};document.getElementById('old').onclick=function(){var t=Date.now()-7*864e5;box().forEach(function(b){b.checked=Date.parse(b.dataset.t)<t});count()};document.getElementById('dl').onclick=function(){sel().forEach(function(b,i){setTimeout(function(){var a=document.createElement('a');a.href='/report/'+b.value+'?key=${k}';a.download='';document.body.appendChild(a);a.click();a.remove()},i*700)})};f.onsubmit=function(){var n=sel().length;if(!n){alert('Tick the reports to delete first.');return false}return confirm('Delete '+n+' report'+(n>1?'s':'')+'? This can\\'t be undone.')}})()</script>`;
+  const html = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Vorax Helper reports</title><style>body{font:14px system-ui,sans-serif;margin:24px;background:#0c1119;color:#c5cddb}table{border-collapse:collapse;width:100%}td,th{padding:6px 10px;border-bottom:1px solid #26344d;text-align:left;vertical-align:top}a{color:#54c7b0}h1{font-size:20px;color:#e9ddc2}.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 12px}button{font:inherit;background:#1a2433;color:#c5cddb;border:1px solid #33445f;border-radius:6px;padding:5px 10px;cursor:pointer}button.danger{border-color:#8a3a3a;color:#ffb4a8}.ok{color:#7fd4a8;margin:0 0 10px}</style><h1>Debug reports (${items.length})</h1>${done ? `<p class="ok">Deleted ${esc(done)} report${done === '1' ? '' : 's'}.</p>` : ''}<form id="f" method="post" action="/reports/delete"><input type="hidden" name="key" value="${esc(keyOf(req))}">${bar}<table><tr><th></th><th>Sent (UTC)</th><th>Size</th><th>App</th><th>Note</th><th></th></tr>${rows}</table></form>${script}`;
   return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
+}
+/** (Vorax Helper) Several reports deleted at once, from the reports page's ticked boxes (a form: key, id, id, ...). */
+async function reportDeleteMany(req, env, url) {
+  const form = await req.formData().catch(() => null);
+  const key = (form && form.get('key')) || keyOf(req);
+  if (!same(String(key), env.EXPORT_KEY || env.KEY)) return json({ error: 'bad key' }, 401);
+  if (!env.REPORTS) return json({ error: 'reports are not set up on this collector' }, 503);
+  const ids = [...new Set((form ? form.getAll('id') : []).map(String))].filter((id) => /^\d{4}-\d\d-\d\d\/[a-z0-9]+-[0-9a-f]{8}$/.test(id)).slice(0, 1000);
+  if (ids.length) await env.REPORTS.delete(ids.map((id) => `reports/${id}.zip`));
+  return Response.redirect(`${url.origin}/reports?key=${encodeURIComponent(String(key))}&deleted=${ids.length}`, 303);
 }
 async function reportGet(req, env, id, url) {
   if (!canExport(req, env)) return json({ error: 'bad key' }, 401);
@@ -263,6 +278,7 @@ export default {
     if (url.pathname === '/cards' && req.method === 'GET') return cardList(req, env, url);
     if (url.pathname.startsWith('/card/') && url.pathname.endsWith('.jpg') && req.method === 'GET') return cardPicture(req, env, url.pathname.slice(6, -4));
     if (url.pathname === '/reports' && req.method === 'GET') return reportList(req, env, url);
+    if (url.pathname === '/reports/delete' && req.method === 'POST') return reportDeleteMany(req, env, url);
     if (url.pathname.startsWith('/report/') && req.method === 'GET') return reportGet(req, env, decodeURIComponent(url.pathname.slice(8)), url);
     return json({ error: 'not found' }, 404);
   },
