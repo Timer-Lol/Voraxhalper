@@ -23,7 +23,8 @@ self.onmessage = (e: MessageEvent<Ask>) => {
     self.postMessage({ id: ask.id, read })
     return
   }
-  const reading = scan(ask.img, DATA, ask.local, { pictures: ask.pictures ?? true })
+  // (Vorax Helper) a picture the page asked for (not the screen watch's) tries every interface scale when it can't read
+  const reading = scan(ask.img, DATA, ask.local, { pictures: ask.pictures ?? true, thorough: ask.trigger !== 'watch' })
   if (reading.frame) reading.frame.trigger = ask.trigger
   self.postMessage({ id: ask.id, reading })
 }

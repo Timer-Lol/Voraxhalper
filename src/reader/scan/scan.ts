@@ -18,7 +18,7 @@ export type LocalRefs = Record<string, ArtFeature[]>
 
 /** pictures: false leaves the cards to their printed names, read afterwards (titles.ts): their pictures are
  *  most of the work, and needed only for a name that can't be read. */
-export function scan(captured: Img, data: ScanData, local: LocalRefs = {}, options: { pictures?: boolean } = {}): Reading {
+export function scan(captured: Img, data: ScanData, local: LocalRefs = {}, options: { pictures?: boolean; thorough?: boolean } = {}): Reading {
   return elsewhere(scanUi(captured, data, local, options))
 }
 
@@ -33,28 +33,43 @@ function elsewhere(r: Reading): Reading {
   return { state: emptyState(), fields: {}, problems: [{ kind: 'notFound' }], frame: r.frame }
 }
 
-function scanUi(captured: Img, data: ScanData, local: LocalRefs, options: { pictures?: boolean }): Reading {
+function scanUi(captured: Img, data: ScanData, local: LocalRefs, options: { pictures?: boolean; thorough?: boolean }): Reading {
   // the interface scale that read last is tried first; when the round can't be read, the others are
   const first = scanAt(captured, data, local, options, lastUi)
   // a picture that isn't the board, or a card mid-flight, isn't read better at another scale; but read at the scale
   // a different screen used (Vorax Helper: the scale is remembered across pictures), it can look like either, so
   // the usual scale (1) gets its chance too
-  if (first.fields.round?.sure) return first
+  if (first.fields.round?.sure) { misses = 0; return first }
   if (first.problems.some(p => p.kind === 'animating' || p.kind === 'notFound')) {
-    if (lastUi === 1) return first
-    const plain = scanAt(captured, data, local, options, 1)
-    if (plain.fields.round?.sure) lastUi = 1
-    return plain.fields.round?.sure ? plain : first
+    // (Vorax Helper) every other scale too, now and then: after hours on other screens the remembered scale was 1.75
+    // (a misread), and the board at 125% then read as "a card mid-flight" for good, since only 100% was tried
+    // besides it (player report, 2026-10-24). On a picture the page asked for (a move in the log, Read, a click)
+    // and on every 8th miss in a row.
+    misses++
+    const all = options.thorough || misses % 8 === 0
+    if (lastUi === 1 && !all) return first
+    for (const ui of all ? [1, ...UI_SCALES].filter((u, i, a) => u !== lastUi && a.indexOf(u) === i) : [1]) {
+      if (ui === lastUi) continue
+      const r = scanAt(captured, data, local, options, ui)
+      if (isBoard(r)) { lastUi = ui; misses = 0; return r }
+    }
+    return first
   }
   for (const ui of UI_SCALES.filter(u => u !== lastUi)) {
     const r = scanAt(captured, data, local, options, ui)
     if (r.fields.round?.sure) {
       lastUi = ui
+      misses = 0
       return r
     }
   }
   return first
 }
+
+/** A reading clear enough to make its interface scale the one tried first: the round and the pick or the Ultimate
+ *  Activity panel read clearly, not a card mid-flight (another screen can pass for a round number alone). */
+const isBoard = (r: Reading) => !!r.fields.round?.sure && (!!r.fields.phase?.sure || !!r.fields.ultimate?.sure) && !r.problems.some(p => p.kind === 'animating' || p.kind === 'notFound')
+let misses = 0
 
 let lastUi = 1
 
