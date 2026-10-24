@@ -43,8 +43,8 @@
       h = row('Game', view.game ? 'Following: ' + esc(view.game) : 'Not running yet.', '') +
         row('Game log', esc(view.log || 'not found yet') + (view.logChosen ? ' (chosen by you)' : ' (found automatically)'), '<div class="btns">' + btn('pickLog', 'Choose…') + (view.logChosen ? btn('resetLog', 'Find automatically') : '') + '</div>') +
         row('Watch the screen for moves', 'Reads the board again whenever the game screen changes and settles, so a picture is taken after every move even when the game’s log can’t say when (its Enable Log off).', sw('watchScreen', v.watchScreen !== false)) +
-        (view.canReport ? row('Send a report to the developer', 'Sends the latest run (its pictures of the game window, what was read and advised, your fixes, the app log) so the problem can be fixed. You’re asked before anything is sent.' + (view.reportStatus ? ' <b>' + esc(view.reportStatus) + '</b>' : ''),
-          '<div class="btns" style="flex-direction:column;align-items:stretch;gap:6px"><input type="text" id="reportNote" maxlength="300" placeholder="What went wrong? (optional)" style="min-width:220px"><button type="button" class="btn primary" id="reportSend">Send…</button></div>') : '') +
+        (view.canReport ? row('Send a report to the developer', 'Sends the latest run (its pictures of the game window, what was read and advised, your fixes, the app log) so the problem can be fixed. No game-log text is kept; user and machine names and addresses are blanked by the scrubber. You’re asked before anything is sent, and “Look at the files” shows every file exactly as it would go.' + (view.reportStatus ? ' <b>' + esc(view.reportStatus) + '</b>' : ''),
+          '<div class="btns" style="flex-direction:column;align-items:stretch;gap:6px"><input type="text" id="reportNote" maxlength="300" placeholder="What went wrong? (optional)" style="min-width:220px"><button type="button" class="btn primary" id="reportSend">Send…</button><button type="button" class="btn" id="reportLook">Look at the files</button></div>') : '') +
         row('Debug bundle', 'The latest run on disk (pictures, readings, advice, your fixes) as one .zip to send.', btn('bundle', 'Save…', 'primary')) +
         (view.update ? row('Updates', esc(view.update.status || (view.update.packaged ? 'Checked automatically a little after start and every 6 hours.' : 'Updates come with the installed app.')), '<div class="btns">' + (view.update.ready ? btn('restartUpdate', 'Restart to update', 'primary') : btn('checkUpdates', 'Check now')) + '</div>') : '') +
         row('Review a run', 'Step through recorded pictures with the reader’s regions drawn on.', '<div class="btns">' + btn('review', 'Open review') + btn('records', 'Records folder') + btn('appLog', 'App log') + '</div>') +
@@ -53,6 +53,8 @@
     $('setBody').innerHTML = h;
     var rs = document.getElementById('reportSend');
     if (rs) rs.onclick = function () { rs.disabled = true; rs.textContent = 'Sending…'; D.sendReport(document.getElementById('reportNote').value).then(function (v) { if (v) view = v; render(); }); };
+    var rl = document.getElementById('reportLook');
+    if (rl && D.previewReport) rl.onclick = function () { D.previewReport(document.getElementById('reportNote').value).then(function (v) { if (v) view = v; render(); }); };
   }
   function refresh() { if (!D) return render(); D.get().then(function (v) { view = v; render(); }); }
 

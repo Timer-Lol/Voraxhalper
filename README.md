@@ -76,7 +76,16 @@ leads to and by the chance of reaching your target (925k by default). The strate
 - **Board sharing is on by default**: the boards the helper reads (tank numbers, card and instrument names, the
   round) are sent to the helper's maker to improve its advice. No pictures, names, accounts or anything about you.
   You're told the first time, and can turn it off in the helper (Share boards).
-- Problem reports are sent only when you press Send (Report a problem, or Ctrl+Alt+J in a game).
+- Problem reports are sent only when you press Send (Report a problem, or Ctrl+Alt+J in a game). A report holds the
+  helper's own record of the latest run: its pictures of the game window (never the rest of your screen), what it
+  read and advised, the fixes you made, the app's log and its settings. **No game-log text**: the helper reads
+  `UE_game.log` only for "the board changed" moments and keeps none of its lines (so nothing about chat, friends,
+  your account or ids can be in a report). Before a report is zipped, a scrubber (`desktop/scrub.js`) blanks user
+  names, machine names and addresses in its text files (a path like `C:\Users\<name>\…` becomes `C:\Users\<user>\…`).
+- **Look before it's sent**: every place that sends a report (Report a problem, Settings → Game log & debug, the Send
+  question after Ctrl+Alt+J) has a "Look at the files first" button that opens a window listing every file exactly
+  as it would be zipped: the text files in full and all the pictures. Its own Send button sends them; closing it
+  sends nothing.
 
 ## Reporting a problem
 Something read wrong or the advice looks off? Press **⚑ Report a problem** at the top of the board analyzer, say

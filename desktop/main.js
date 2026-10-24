@@ -560,7 +560,7 @@ ipcMain.on('overlay:fold', (e, folded) => { if (fromOverlay(e)) { settings.folde
 ipcMain.on('overlay:helper', (e) => fromOverlay(e) && toggleHelper());
 ipcMain.on('overlay:snap', (e) => fromOverlay(e) && game.running && send('helper', 'snap'));
 // the card's Send / Not now after Ctrl+Alt+J: the player's answer is the consent, so no second question
-ipcMain.on('overlay:report', (e, yes) => { if (!fromOverlay(e) || !pendingReport) return; const r = pendingReport; pendingReport = null; if (yes) sendReport(r.note, true); else send('overlay', 'clicker', 'Not sent. You can send it later from Settings → Game log & debug.'); });
+ipcMain.on('overlay:report', (e, yes) => { if (!fromOverlay(e) || !pendingReport) return; const r = pendingReport; pendingReport = null; if (yes === 'look') previewReport(r.note); else if (yes) sendReport(r.note, true); else send('overlay', 'clicker', 'Not sent. You can send it later from Settings → Game log & debug.'); });
 let pendingReport = null;
 
 // ---------- The debug record: each run's events and pictures, kept on this PC (the last RUNS runs) ----------
@@ -607,8 +607,55 @@ function buildBundle(maxBytes = Infinity, note = '') {
   const size = (list) => list.reduce((a, f) => a + (typeof f.data === 'string' ? Buffer.byteLength(f.data) : f.data.length) + 100, 0);
   while (frames.length && size(base) + size(frames) > maxBytes) frames.shift();
   const name = `vorax-debug-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.zip`;
-  return { name, bytes: Buffer.from(globalThis.VoraxZip.zip([...base.slice(0, 1), ...frames, ...base.slice(1)])), pictures: frames.length };
+  // the scrubber: user and machine names and addresses are blanked in every text file (scrub.js); pictures are of
+  // the game window only and pass through
+  const files = require('./scrub').scrubFiles([...base.slice(0, 1), ...frames, ...base.slice(1)]);
+  return { name, bytes: Buffer.from(globalThis.VoraxZip.zip(files)), pictures: frames.length, files, run: runs[runs.length - 1] };
 }
+
+// ---------- Looking at a report before it is sent: every file, as it will be zipped ----------
+const PREVIEW_DIR = path.join(app.getPath('userData'), 'report-preview');
+let previewNote = '';
+/** Writes the report's files to PREVIEW_DIR with an index.html that shows them all, and opens it in a window. */
+function previewReport(said = '') {
+  const b = buildBundle(REPORT_MAX, said);
+  if (!b) return (reportStatus = 'Nothing recorded yet: play a round with the helper following the game first.');
+  previewNote = said;
+  fs.rmSync(PREVIEW_DIR, { recursive: true, force: true });
+  fs.mkdirSync(path.join(PREVIEW_DIR, 'frames'), { recursive: true });
+  const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const mb = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : n >= 1024 ? `${Math.round(n / 1024)} KB` : `${n} B`);
+  const size = (f) => (typeof f.data === 'string' ? Buffer.byteLength(f.data) : f.data.length);
+  const texts = b.files.filter((f) => !/^frames\//.test(f.name)), frames = b.files.filter((f) => /^frames\//.test(f.name));
+  for (const f of frames) fs.writeFileSync(path.join(PREVIEW_DIR, f.name), f.data);
+  const total = b.files.reduce((a, f) => a + size(f), 0);
+  const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>What the report holds · Vorax Helper</title>
+<style>:root{color-scheme:dark}body{margin:0;background:#0c1119;color:#e6edf3;font:14px/1.45 system-ui,Segoe UI,sans-serif}main{max-width:1200px;margin:0 auto;padding:16px}
+h1{font-size:19px;margin:0 0 6px}h2{font-size:15px;margin:16px 0 6px}.note{color:#9aa7b8;font-size:13px}.panel{background:#121a26;border:1px solid #243041;border-radius:10px;padding:12px 14px;margin:10px 0}
+pre{white-space:pre-wrap;word-break:break-all;background:#0a0f17;border:1px solid #243041;border-radius:8px;padding:10px;max-height:55vh;overflow:auto;font-size:12px}details summary{cursor:pointer;padding:4px 0}
+.pics{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:10px}figure{margin:0}figure img{width:100%;border-radius:8px;border:1px solid #243041;background:#000}figcaption{font-size:12px;color:#9aa7b8;margin-top:3px}
+.bar{position:sticky;top:0;background:#0c1119;padding:10px 0;border-bottom:1px solid #243041;display:flex;gap:10px;align-items:center;flex-wrap:wrap;z-index:2}
+button{font:inherit;padding:8px 14px;border-radius:8px;border:1px solid #243041;background:#1a2432;color:#e6edf3;cursor:pointer}button.primary{background:#3b82f6;border-color:#3b82f6;color:#fff}#st{color:#9aa7b8}</style></head><body><main>
+<div class="bar"><button class="primary" id="send">Send this report</button><button id="close">Don't send</button><span id="st"></span></div>
+<h1>What the report holds</h1>
+<p class="note">Exactly these ${b.files.length} files (${mb(total)}) go, zipped, to the Vorax Helper developer when you press Send: nothing else from your PC. The helper keeps no game-log text (it reads the game's log only for "the board changed" moments). User names, machine names and addresses in the text files were blanked by the scrubber (shown as &lt;user&gt;, &lt;pc&gt;, &lt;ip&gt;). The pictures are of the game window only, never the rest of your screen.${said ? ` Your note: <b>${esc(said)}</b>` : ''}</p>
+<div class="panel"><h2>Text files (${texts.length})</h2>${texts.map((f) => `<details${/manifest/.test(f.name) ? ' open' : ''}><summary>${esc(f.name)} · ${mb(size(f))}</summary><pre>${esc(typeof f.data === 'string' ? f.data : f.data.toString('utf8')).slice(0, 1500000)}</pre></details>`).join('')}
+<p class="note">manifest.json: the app's version, your screens' sizes, the game-log path and the settings. events.jsonl: each picture's reading (tank numbers, card and instrument names), the advice shown, the fixes you made, errors. app-log.txt: the app's own log (what it found and did).</p></div>
+<div class="panel"><h2>Pictures of the game window (${frames.length})</h2><div class="pics">${frames.map((f) => `<figure><a href="${f.name}" target="_blank"><img loading="lazy" src="${f.name}" alt="${esc(f.name)}"></a><figcaption>${esc(f.name)} · ${mb(size(f))}</figcaption></figure>`).join('') || '<span class="note">None.</span>'}</div></div>
+<script>document.getElementById('send').onclick=()=>{if(!confirm('Send these files to the Vorax Helper developer?'))return;document.getElementById('send').disabled=true;document.getElementById('st').textContent='Sending…';window.VoraxPreview.send().then((s)=>{document.getElementById('st').textContent=s||'';});};document.getElementById('close').onclick=()=>window.VoraxPreview.close();</script>
+</main></body></html>`;
+  fs.writeFileSync(path.join(PREVIEW_DIR, 'index.html'), html);
+  if (wins.preview && !wins.preview.isDestroyed()) wins.preview.close();
+  const w = new BrowserWindow({ width: 1200, height: 900, title: 'What the report holds · Vorax Helper', backgroundColor: '#0c1119', icon: ICON, autoHideMenuBar: true, webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preview-preload.js') } });
+  w.removeMenu();
+  w.webContents.setWindowOpenHandler(({ url }) => { if (url.startsWith('file://') && url.includes('report-preview')) shell.openPath(decodeURIComponent(url.replace(/^file:\/\/\/?/, ''))); return { action: 'deny' }; });
+  w.loadFile(path.join(PREVIEW_DIR, 'index.html'));
+  wins.preview = w;
+  return (reportStatus = 'Showing what the report holds; nothing sent yet.');
+}
+const fromPreview = (e) => !!wins.preview && !wins.preview.isDestroyed() && e.sender === wins.preview.webContents;
+ipcMain.handle('preview:send', async (e) => { if (!fromPreview(e)) return null; const s = await sendReport(previewNote, true); if (wins.preview && !wins.preview.isDestroyed()) setTimeout(() => wins.preview && !wins.preview.isDestroyed() && wins.preview.close(), 1500); return s; });
+ipcMain.on('preview:close', (e) => { if (fromPreview(e) && wins.preview) wins.preview.close(); });
 async function saveRunBundle(quiet = false) {
   const b = buildBundle();
   if (!b) { if (!quiet) dialog.showMessageBox({ message: 'Nothing recorded yet.', detail: 'Play a round with the helper following the game first.' }); return null; }
@@ -646,10 +693,11 @@ async function sendReport(said = '', agreed = false) {
   const mb = (b.bytes.length / 1048576).toFixed(1);
   const parent = wins.helper && !wins.helper.isDestroyed() && wins.helper.isVisible() ? wins.helper : undefined;
   const ok = agreed ? { response: 0 } : await dialog.showMessageBox(parent, {
-    type: 'question', buttons: ['Send', 'Cancel'], defaultId: 0, cancelId: 1, title: 'Send a debug report',
+    type: 'question', buttons: ['Send', 'Look at the files first', 'Cancel'], defaultId: 0, cancelId: 2, title: 'Send a debug report',
     message: `Send this debug report (${mb} MB) to the Vorax Helper developer?`,
-    detail: `It holds the latest run: ${b.pictures} pictures of the game window, what the helper read and advised, the fixes you made, the app's log and its settings${said ? ', and your note' : ''}. Nothing else from your PC, no account details. It's kept by the developer only, to fix the helper.`,
+    detail: `It holds the latest run: ${b.pictures} pictures of the game window, what the helper read and advised, the fixes you made, the app's log and its settings${said ? ', and your note' : ''}. No game-log text; user and machine names and addresses are blanked. Nothing else from your PC, no account details. It's kept by the developer only, to fix the helper.`,
   });
+  if (ok.response === 1) return previewReport(said);
   if (ok.response !== 0) return (reportStatus = 'Not sent.');
   reportStatus = `Sending (${mb} MB)…`;
   send('overlay', 'clicker', reportStatus);
@@ -777,6 +825,7 @@ function settingsView() {
 ipcMain.handle('settings:get', (e) => (fromHelper(e) ? settingsView() : null));
 // agreed: the page's Report button, its text saying what is sent (no second question)
 ipcMain.handle('settings:sendReport', async (e, said, agreed) => { if (!fromHelper(e)) return null; await sendReport(typeof said === 'string' ? said : '', agreed === true); return settingsView(); });
+ipcMain.handle('settings:previewReport', (e, said) => { if (!fromHelper(e)) return null; previewReport(typeof said === 'string' ? said.slice(0, 300) : ''); return settingsView(); });
 ipcMain.handle('settings:set', (e, key, value) => {
   if (!fromHelper(e) || !(key in SETTING_KEYS)) return null;
   const kind = SETTING_KEYS[key];

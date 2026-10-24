@@ -6,7 +6,7 @@ contextBridge.exposeInMainWorld('VoraxCard', {
   fold: (folded) => ipcRenderer.send('overlay:fold', folded),
   openHelper: () => ipcRenderer.send('overlay:helper'),
   snap: () => ipcRenderer.send('overlay:snap'),
-  report: (send) => ipcRenderer.send('overlay:report', !!send),
+  report: (send) => ipcRenderer.send('overlay:report', send === 'look' ? 'look' : !!send),
   dragStart: () => ipcRenderer.send('overlay:dragStart'),
   dragEnd: () => ipcRenderer.send('overlay:dragEnd'),
 });

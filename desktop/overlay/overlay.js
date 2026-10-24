@@ -19,10 +19,11 @@
   // Ctrl+Alt+J: the report is saved; the player is asked here, on the card (a dialog would open behind the game)
   api.on('reportAsk', function (r) {
     if (!r) { $('rep').hidden = true; fit(); return; }
-    $('repText').textContent = 'Send it to the developer? ' + (r.mb ? '(' + r.mb + ' MB) ' : '') + 'It holds this run\u2019s pictures of the game window, what the helper read and advised, and its log. Nothing else from your PC.';
+    $('repText').textContent = 'Send it to the developer? ' + (r.mb ? '(' + r.mb + ' MB) ' : '') + 'It holds this run\u2019s pictures of the game window, what the helper read and advised, and its log (no game-log text; names and addresses blanked). Nothing else from your PC. "Look first" shows every file before anything goes.';
     $('rep').hidden = false; $('card').classList.remove('folded'); fit();
   });
   $('repSend').onclick = function () { $('rep').hidden = true; api.report(true); fit(); };
+  $('repLook').onclick = function () { $('rep').hidden = true; api.report('look'); fit(); };
   $('repNo').onclick = function () { $('rep').hidden = true; api.report(false); fit(); };
   // a status line (Game found, Reading…) shows for a few seconds, then the round and target come back
   var cardMeta = '', statusUntil = 0, statusTimer = 0;

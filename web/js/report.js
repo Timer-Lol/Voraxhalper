@@ -15,7 +15,7 @@
     var parts = app
       ? 'the latest run the app recorded: its pictures of the game window, what it read and advised, the fixes you made, the app’s log and its settings'
       : 'what this page recorded: the pictures of the game it read, what it read and advised, and the fixes you made (' + (window.VoraxDebug ? VoraxDebug.counts().frames + ' pictures' : 'nothing yet') + ')';
-    return 'Sends ' + parts + ', with your note, to the helper’s maker. Nothing else from your PC.' +
+    return 'Sends ' + parts + ', with your note, to the helper’s maker. Nothing else from your PC; no game-log text' + (app ? ', and user and machine names and addresses in the text files are blanked. “Look at the files first” shows every file exactly as it would go.' : '.') +
       (issues ? ' A public issue is also opened on the helper’s GitHub page with your note and the board at the time (never the pictures).' : '');
   }
   function status(t, cls) { var s = $('repStatus'); s.className = 'note' + (cls ? ' ' + cls : ''); s.innerHTML = t; }
@@ -59,6 +59,7 @@
   }
 
   $('repBtn').onclick = open;
+  if (app && app.previewReport) { $('repLook').hidden = false; $('repLook').onclick = function () { app.previewReport($('repNote').value.trim().slice(0, 300)); status('Opened a window with every file the report would hold; its Send button sends them.', 'ok'); }; }
   $('repSend').onclick = send;
   $('repFile').onclick = function () { $('dbgSave') ? $('dbgSave').click() : VoraxDebug.bundle({}); status('Saved to your Downloads folder as vorax-debug-….zip.', 'ok'); };
   $('repClose').onclick = function () { dlg.close(); };

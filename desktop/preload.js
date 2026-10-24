@@ -30,6 +30,8 @@ if (/\/analyze\.html$/.test(location.pathname)) {
       do: (what) => ipcRenderer.invoke('settings:do', what),
       onOpen: (cb) => ipcRenderer.on('openSettings', (e, tab) => cb(typeof tab === 'string' ? tab : undefined)),
       sendReport: (said, agreed) => ipcRenderer.invoke('settings:sendReport', String(said || '').slice(0, 300), agreed === true),
+      // opens a window showing every file a report would hold (scrubbed, as it would be zipped), with its own Send button
+      previewReport: (said) => ipcRenderer.invoke('settings:previewReport', String(said || '').slice(0, 300)),
     },
     record: (e) => ipcRenderer.send('debug:event', e),
     recordFrame: (name, bytes) => ipcRenderer.send('debug:frame', name, new Uint8Array(bytes)),
