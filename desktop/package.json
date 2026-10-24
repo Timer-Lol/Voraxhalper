@@ -1,7 +1,7 @@
 {
   "name": "vorax-helper-overlay",
   "productName": "Vorax Helper",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Vorax Helper as a Windows app, with its advice in a small card over the game.",
   "license": "MIT",
   "private": true,

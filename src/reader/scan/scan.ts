@@ -5,7 +5,7 @@ import type { ScanData } from './data'
 import { HAND_SCALES, layout, scaleHand, shiftHand, UI_SCALES, type HandFit, type Layout } from './layout'
 import { gray, type ArtFeature, type Img } from './pixels'
 import { readText } from './digits'
-import { crossCheck, readTank } from './tanks'
+import { crossCheck, readTank, type TankRead } from './tanks'
 import { cardsPresent, fanSize, headerOnly, loneMiddle, readHand, readPhase } from './cards'
 import { readInstruments } from './instruments'
 import { normalColours, readAreas } from './levels'
@@ -71,6 +71,9 @@ function scanUi(captured: Img, data: ScanData, local: LocalRefs, options: { pict
 const isBoard = (r: Reading) => !!r.fields.round?.sure && (!!r.fields.phase?.sure || !!r.fields.ultimate?.sure) && !r.problems.some(p => p.kind === 'animating' || p.kind === 'notFound')
 let misses = 0
 
+/** How many tanks' Activity x Quantity multiplied to their total. */
+const checkedOut = (tanks: TankRead[]) => tanks.filter((t, i) => t.monster && t.fields[`tank${i}.activity`]?.sure).length
+
 let lastUi = 1
 
 function scanAt(captured: Img, data: ScanData, local: LocalRefs, { pictures = true }: { pictures?: boolean }, ui: number): Reading {
@@ -82,19 +85,30 @@ function scanAt(captured: Img, data: ScanData, local: LocalRefs, { pictures = tr
   const { l: lh, shift } = alignHand(img, l0, data, ui)
   // (Vorax Helper) the tanks' labels where their hearts are, for a screen shape the layout wasn't measured on
   const labels = findLabels(img, lh)
-  const l = labels && labels.off > LABEL_MIN_OFF * (img.height / 1440) ? withLabels(lh, labels) : lh
   const g = gray(img)
   const fields: Record<string, FieldRead> = {}
   const problems: Problem[] = []
   const frame = { width: img.width, height: img.height }
 
-  const present = cardsPresent(img, l)
-  const lone = present === 1 && loneMiddle(img, l)
+  // (the labels move only the tanks' places: the hand and the panels read from the hand's layout)
+  const present = cardsPresent(img, lh)
+  const lone = present === 1 && loneMiddle(img, lh)
   if ((present === 1 && !lone) || present === 2) return { state: emptyState(), fields: {}, problems: [{ kind: 'animating' }], frame }
 
   // no cards dealt yet (or all gone): only the header to read
-  const hand = present === 0 ? { ...headerOnly(img, l, data), ranks: [] } : pictures ? readHand(img, l, data, local, lone ? 1 : undefined) : headerOnly(img, l, data)
-  const tanks = [0, 1, 2, 3, 4, 5].map(i => readTank(img, g, l, i, data))
+  const hand = present === 0 ? { ...headerOnly(img, lh, data), ranks: [] } : pictures ? readHand(img, lh, data, local, lone ? 1 : undefined) : headerOnly(img, lh, data)
+  // The labels moved onto their hearts only when that reads the tanks better: a label's heart sits further right
+  // the shorter its numbers are, and five short labels at once ("1296 / 6 x 216") put the hearts far enough off
+  // to move every band onto the tops of the digits ("3306" for 1296, the board kept at the round before: player
+  // report, 2026-10-24). Activity x Quantity has to multiply to the total, so the read with more tanks that
+  // check out is the right one; a tie keeps the hearts' places.
+  let l = lh
+  let tanks = [0, 1, 2, 3, 4, 5].map(i => readTank(img, g, lh, i, data))
+  if (labels && labels.off > LABEL_MIN_OFF * (img.height / 1440)) {
+    const lf = withLabels(lh, labels)
+    const moved = [0, 1, 2, 3, 4, 5].map(i => readTank(img, g, lf, i, data))
+    if (checkedOut(moved) >= checkedOut(tanks)) { l = lf; tanks = moved }
+  }
   if (!hand.phase && tanks.every(t => !t.monster)) return { state: emptyState(), fields: {}, problems: [{ kind: 'notFound' }], frame: { width: img.width, height: img.height } }
 
   // (Vorax Helper) the Ultimate Activity panel is the sum of the tanks' totals: it confirms them, or works out
