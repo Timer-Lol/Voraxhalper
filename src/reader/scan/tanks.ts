@@ -40,13 +40,18 @@ export function stats(total: string | undefined, aq: string | undefined): { acti
  */
 export function archetypeOf(img: Img, r: Rect): { archetype: Archetype; sure: boolean } {
   const n = { boneSentry: 0, pest: 0, aemberon: 0 }
+  // (Vorax Helper) a whole icon's width either side: in a small window the icon is a dozen pixels across and the
+  // layout's tank places, blended between the screen shapes it was measured on, can be most of that off (a
+  // 1598x872 window: every icon missed, so every tank read as an Agito, the advice built on the wrong monsters:
+  // player report, 2026-10-25). Not up or down: the name under it can be gold or blue.
   for (let y = Math.max(0, Math.floor(r.y)); y < Math.min(img.height, r.y + r.h); y++) {
-    for (let x = Math.max(0, Math.floor(r.x)); x < Math.min(img.width, r.x + r.w); x++) {
+    for (let x = Math.max(0, Math.floor(r.x - r.w)); x < Math.min(img.width, r.x + 2 * r.w); x++) {
       const i = (y * img.width + x) * 4
       const [h, s, v] = hsv(img.data[i], img.data[i + 1], img.data[i + 2])
       if (v < 0.45) continue
       if (h >= 35 && h <= 65 && s >= 0.5) n.boneSentry++
-      else if (h >= 255 && h <= 305 && s >= 0.5) n.pest++
+      // (a Pest's violet washes out to a saturation of 0.3-0.45 on an icon a dozen pixels across: same report)
+      else if ((h >= 255 && h <= 305 && s >= 0.5) || (h >= 262 && h <= 300 && s >= 0.25)) n.pest++
       else if (h >= 190 && h <= 240 && s >= 0.25) n.aemberon++
     }
   }
